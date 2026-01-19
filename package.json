@@ -1,0 +1,84 @@
+{
+  "name": "electron-todo-list",
+  "version": "1.0.0",
+  "description": "A simple todo list manager built with Electron",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux",
+    "dist:win:quick": "electron-builder --win --publish never"
+  },
+  "keywords": ["electron", "todo", "manager", "desktop"],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^39.2.3",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.example.todolist",
+    "productName": "Todo List Manager",
+    "copyright": "Copyright © 2025 ${author}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "app.js",
+      "index.html",
+      "styles.css",
+      "package.json",
+      "assets/**/*"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64", "ia32"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64", "ia32"]
+        }
+      ],
+      "publisherName": "Todo List Manager",
+      "legalTrademarks": "Todo List Manager",
+      "requestedExecutionLevel": "asInvoker",
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Todo List Manager",
+      "uninstallDisplayName": "Todo List Manager",
+      "deleteAppDataOnUninstall": false,
+      "allowElevation": true,
+      "installerLanguages": ["zh_CN"],
+      "language": "2052"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.png"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Utility",
+      "icon": "assets/icon.png"
+    },
+    "npmRebuild": false,
+    "publish": {
+      "provider": "generic",
+      "url": "https://example.com/releases/"
+    }
+  }
+}
