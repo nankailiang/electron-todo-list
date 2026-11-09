@@ -220,6 +220,12 @@
                     <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:0.85rem;color:var(--text-2);">
                         <input type="checkbox" id="filter-hide-unstarted"> 隐藏未开始任务（开始日晚于今天）
                     </label>
+                    <!-- 保存筛选：行内命名（Electron 不支持 window.prompt） -->
+                    <div class="save-filter-row hidden" id="save-filter-row">
+                        <input type="text" id="save-filter-name" class="form-control" placeholder="筛选名称，如「本周高优先」" autocomplete="off">
+                        <button class="btn btn-primary btn-sm" id="save-filter-confirm">保存</button>
+                        <button class="btn btn-ghost btn-sm" id="save-filter-cancel">取消</button>
+                    </div>
                     <div class="saved-filter-bar" id="saved-filter-bar"></div>
                 </div>
 

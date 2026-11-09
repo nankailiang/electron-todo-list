@@ -657,7 +657,7 @@ function normalizeTodo(t) {
         id: t.id ? String(t.id) : (Date.now().toString() + Math.random().toString(36).slice(2, 8)),
         listId: t.listId || 'default',
         startDate: t.startDate || '',
-        date: t.date || new Date().toISOString().split('T')[0],
+        date: t.date || todayStr(),
         dueTime: t.dueTime || '',
         priority: ['high', 'medium', 'low'].includes(t.priority) ? t.priority : 'medium',
         content: String(t.content).trim(),
@@ -732,7 +732,7 @@ function parseTXT(content) {
     const todos = [];
     content.trim().split('\n').forEach(line => {
         const t = line.trim();
-        if (t) todos.push({ content: t.replace(/^\d+\.\s*/, ''), date: new Date().toISOString().split('T')[0], priority: 'medium', status: 'pending' });
+        if (t) todos.push({ content: t.replace(/^\d+\.\s*/, ''), date: todayStr(), priority: 'medium', status: 'pending' });
     });
     return todos;
 }
@@ -748,7 +748,7 @@ function parseMarkdown(content) {
             todos.push({
                 content: text,
                 status: m[1].toLowerCase() === 'x' ? 'completed' : 'pending',
-                date: new Date().toISOString().split('T')[0],
+                date: todayStr(),
                 priority: 'medium'
             });
         }

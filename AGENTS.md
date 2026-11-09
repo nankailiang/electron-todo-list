@@ -20,7 +20,7 @@ npm install
 npm start            # 开发运行（注意：走 electron-launch.js，不是 electron .）
 npm run dist:win     # 打 Windows 包（nsis 安装版 + portable 便携版，x64+ia32），产物在 dist/
 ```
-- `electron-launch.js`：用 `require("electron")` 定位**本地** electron 并 spawn，清掉会报错的 `NODE_OPTIONS`。**保留它**，别直接 `electron .`（历史上有全局 electron@43 冲突）。
+- `electron-launch.js`：用 `require("electron")` 定位**本地** electron 并 spawn，清掉会报错的 `NODE_OPTIONS` 与 `ELECTRON_RUN_AS_NODE`（后者会让 electron.exe 退化成 Node、静默不弹窗）。**保留它**，别直接 `electron .`（历史上有全局 electron@43 冲突）。
 - 依赖：`electron ^39.2.3`、`electron-builder ^26.15.3`（仅 devDependencies，运行时零第三方依赖）。
 - 构建配置在 `package.json → build`：`asar:true`、`output: dist`、`win.target = nsis+portable`、**arch 同时含 x64 和 ia32**（这使单包约 167MB；只想小一半就改成仅 `x64`）。
 - `dist:win` 脚本内置了 `ELECTRON_MIRROR=npmmirror`（国内下载 electron 必需）。
@@ -90,13 +90,14 @@ backups/          # 每日备份 todo-backup-YYYY-MM-DD.json，保留 7 天（�
 ---
 
 ## 7. 已实现功能清单
-多清单(颜色) · 列表/看板(拖拽改状态)/日历(月+周时间块拖拽) · 仪表盘图表(优先/趋势/柱/标签/效率) · 日报(生成/编辑/导出) · 标签 · 子任务 · 重复(日/周/月/自定义) · 到期提醒+每日提醒(系统通知) · 搜索(含拼音首字母)+高级筛选+保存筛选 · 批量操作 · 导入导出(json/csv/txt/md) · 数据加密 · 备份/恢复(每日+手动) · 单实例锁 · 命令面板+快捷录入(全局快捷键) · 一键自动排程 · 开始/截止双日期 · 深浅色主题 · 紧凑模式。
+多清单(颜色) · 列表/看板(拖拽改状态)/日历(月+周时间块拖拽) · 仪表盘图表(优先/趋势/柱/标签/效率) · 日报(生成/编辑/导出) · 标签 · 子任务 · 重复(日/周/月/自定义) · 到期提醒+每日提醒(系统通知) · 搜索(含拼音首字母)+高级筛选+保存筛选 · 批量操作 · 导入导出(json/csv/txt/md) · 数据加密 · 备份/恢复(每日+手动) · 单实例锁 · 命令面板+快捷录入(全局快捷键) · 一键自动排程 · 开始/截止双日期 · 深浅色主题 · 紧凑模式 · 列表手动拖拽排序(仅 sort=manual 且非多选时) · 双击任务卡片编辑。
 
 ---
 
 ## 8. 已知问题 / 注意点（重要）
 - **日期**：全部按“本地日期”处理。别再用 `new Date().toISOString().split('T')[0]` 取“今天”（UTC+8 凌晨会错一天）。
 - **虚拟滚动已弃用**：`renderList()` 现在全量渲染（旧固定行高虚拟列表会因卡片高度不一而错位）；`renderVirtualList` 仍保留但不再调用。
+- **不要用 `window.prompt`**：Electron 不支持，会直接抛异常。命名类输入统一走行内输入行（参考筛选面板的 `#save-filter-row`）或 `pass-modal`。
 - **加密备份**：开启加密后备份写密文；恢复时需先解锁。
 - **关窗落盘**：`saveTodosSync/saveSettingsSync`（sendSync）在 `beforeunload` 兜底。
 - **归档**：任务有 `archived`，默认列表不显示，筛选面板可“显示归档”。

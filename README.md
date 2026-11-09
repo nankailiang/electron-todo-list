@@ -52,8 +52,7 @@
 - ✅ **列表密度**：舒适 / 紧凑两种密度
 
 ### 性能与稳定性
-- ✅ **虚拟滚动**：大列表（>80 条）虚拟渲染，保持流畅
-- ✅ **防抖 / 节流**：搜索、筛选、滚动均做性能优化
+- ✅ **全量渲染 + 防抖节流**：任务列表全量渲染（卡片高度不一，固定行高的虚拟滚动会错位，已弃用）；搜索、筛选等高频输入均做防抖处理
 - ✅ **容错机制**：导入异常提示、存储校验、原子写入防止数据损坏
 
 ## 安装和运行
@@ -112,6 +111,7 @@ electron-todo-list/
   "status": "pending",
   "priority": "high",
   "date": "2025-11-22",
+  "startDate": "",
   "dueTime": "18:00",
   "listId": "default",
   "tags": ["工作", "重要"],
@@ -120,12 +120,14 @@ electron-todo-list/
   "pinned": false,
   "archived": false,
   "order": 0,
-  "repeat": "none",
+  "repeat": { "type": "none", "interval": 1 },
   "createdAt": "2025-11-22T08:00:00.000Z",
   "startedAt": null,
   "completedAt": null
 }
 ```
+
+> `repeat.type` 取 `none | daily | weekly | monthly | custom`；`custom` 时 `interval` 为间隔天数。
 
 ## 应用打包指南
 

@@ -314,6 +314,10 @@ input[type="color"].form-control { padding: 3px; }
 .saved-filter-chip:hover { border-color: var(--primary); background: var(--primary); color: #fff; }
 .saved-filter-chip .rm { color: inherit; opacity: 0.6; width: 14px; height: 14px; }
 .saved-filter-chip .rm:hover { opacity: 1; }
+/* 保存筛选：行内命名行 */
+.save-filter-row { display: flex; gap: 8px; align-items: center; margin-top: 12px; animation: sfRowIn 0.16s ease; }
+.save-filter-row .form-control { flex: 1; max-width: 260px; height: 34px; font-size: 0.85rem; }
+@keyframes sfRowIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
 /* ==== 批量操作条 ==== */
 .bulk-bar {
@@ -327,6 +331,11 @@ input[type="color"].form-control { padding: 3px; }
 /* ==== 列表视图 ==== */
 .task-list { display: flex; flex-direction: column; gap: 10px; }
 .task-list.compact { gap: 6px; }
+/* 手动排序时的拖拽态 */
+.task-list.reorderable .task-item { cursor: grab; }
+.task-item.dragging { opacity: 0.45; cursor: grabbing; }
+.task-item.drop-before { box-shadow: inset 0 3px 0 var(--primary), var(--shadow); }
+.task-item.drop-after { box-shadow: inset 0 -3px 0 var(--primary), var(--shadow); }
 
 .task-item {
     background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--border-strong);

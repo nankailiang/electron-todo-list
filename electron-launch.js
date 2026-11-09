@@ -7,7 +7,9 @@ if (!args.includes(".") && !args.includes(process.cwd())) {
   args.unshift(".");
 }
 // Electron's bundled Node rejects certain NODE_OPTIONS from the parent env (e.g. --use-system-ca).
+// ELECTRON_RUN_AS_NODE would make electron.exe run as plain Node (no window) - always strip it.
 const env = Object.assign({}, process.env);
 delete env.NODE_OPTIONS;
+delete env.ELECTRON_RUN_AS_NODE;
 const child = spawn(electronPath, args, { stdio: "inherit", windowsHide: false, env });
 child.on("exit", (code) => process.exit(code === null ? 1 : code));

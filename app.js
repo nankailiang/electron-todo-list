@@ -233,7 +233,14 @@ function migrateData() {
         if (t.dueTime === undefined) { t.dueTime = ''; changed = true; }
         if (t.startDate === undefined) { t.startDate = ''; changed = true; }
         if (t.order === undefined) { t.order = 0; changed = true; }
-        if (t.repeat === undefined) { t.repeat = { type: 'none', interval: 1 }; changed = true; }
+        // repeat 统一为 {type, interval}：兼容旧版字符串（如 "none"/"daily"）
+        if (typeof t.repeat === 'string') {
+            t.repeat = { type: t.repeat || 'none', interval: 1 }; changed = true;
+        } else if (!t.repeat || typeof t.repeat !== 'object') {
+            t.repeat = { type: 'none', interval: 1 }; changed = true;
+        } else if (!t.repeat.type) {
+            t.repeat = { type: 'none', interval: parseInt(t.repeat.interval, 10) || 1 }; changed = true;
+        }
         if (t.startedAt === undefined) { t.startedAt = t.status === 'in-progress' ? (t.updatedAt || null) : null; changed = true; }
         if (t.completedAt === undefined) { t.completedAt = t.status === 'completed' ? (t.updatedAt || null) : null; changed = true; }
     });
@@ -270,7 +277,8 @@ function runAutomations() {
 
 // 完成重复任务时，生成下一个周期任务
 function spawnRecurring(task) {
-    if (!task.repeat || task.repeat.type === 'none' || !task.date) return;
+    // 类型缺失/未知一律不生成，避免把一次性任务误判成每日重复
+    if (!task.repeat || typeof task.repeat !== 'object' || !task.repeat.type || task.repeat.type === 'none' || !task.date) return;
     // 去重：若该任务已经生成过后继（recurPrevId 指向它），不再重复生成
     if (State.todos.some(x => x.recurPrevId === task.id)) return;
     const type = task.repeat.type;
@@ -526,12 +534,15 @@ function renderSidebar() {
 }
 
 // ---------------------------------------------------------------------------
-// 列表视图（含虚拟滚动）
+// 列表视图（全量渲染 + 手动拖拽排序）
 // ---------------------------------------------------------------------------
 let listScrollHandler = null;
 function renderList(visible) {
     const container = $('task-list');
     container.classList.toggle('compact', State.settings.density === 'compact');
+    // 仅「手动」排序且非多选时允许拖拽调整顺序
+    const reorderable = State.sort.by === 'manual' && !State.selectMode;
+    container.classList.toggle('reorderable', reorderable);
 
     // 统一全量渲染（此前按固定行高的虚拟滚动会因卡片高度不一导致重叠/错位，已弃用）
     if (listScrollHandler) { const sc = document.querySelector('.content'); if (sc) sc.removeEventListener('scroll', listScrollHandler); listScrollHandler = null; }
@@ -539,6 +550,62 @@ function renderList(visible) {
     container.style.position = '';
     container.innerHTML = '';
     visible.forEach(t => container.appendChild(createTaskEl(t)));
+    if (reorderable) bindListReorder(container);
+}
+
+// 列表视图手动拖拽排序（sort = manual 时生效）
+let listDragId = null;
+function clearListDropMarks() {
+    document.querySelectorAll('.task-item.drop-before, .task-item.drop-after')
+        .forEach(e => e.classList.remove('drop-before', 'drop-after'));
+}
+function bindListReorder(container) {
+    container.querySelectorAll('.task-item').forEach(el => {
+        el.draggable = true;
+        el.addEventListener('dragstart', (e) => {
+            listDragId = el.dataset.id;
+            el.classList.add('dragging');
+            if (e.dataTransfer) {
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', listDragId);
+            }
+        });
+        el.addEventListener('dragend', () => { el.classList.remove('dragging'); clearListDropMarks(); listDragId = null; });
+        el.addEventListener('dragover', (e) => {
+            if (!listDragId || el.dataset.id === listDragId) return;
+            e.preventDefault();
+            const r = el.getBoundingClientRect();
+            const after = (e.clientY - r.top) > r.height / 2;
+            clearListDropMarks();
+            el.classList.add(after ? 'drop-after' : 'drop-before');
+            el._dropAfter = after;
+        });
+        el.addEventListener('dragleave', () => el.classList.remove('drop-before', 'drop-after'));
+        el.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const targetId = el.dataset.id;
+            const after = !!el._dropAfter;
+            clearListDropMarks();
+            if (listDragId && targetId !== listDragId) reorderTodos(listDragId, targetId, after);
+            listDragId = null;
+        });
+    });
+}
+
+function reorderTodos(dragId, targetId, after) {
+    const from = State.todos.findIndex(t => t.id === dragId);
+    if (from < 0) return;
+    const [moved] = State.todos.splice(from, 1);
+    let to = State.todos.findIndex(t => t.id === targetId);
+    if (to < 0) { State.todos.splice(from, 0, moved); return; }
+    if (after) to += 1;
+    State.todos.splice(to, 0, moved);
+    // order 需与当前排序方向一致：降序时把数组顺序反过来编号，保证拖完的视觉顺序不被翻转
+    const n = State.todos.length;
+    const desc = State.sort.dir === 'desc';
+    State.todos.forEach((t, i) => { t.order = desc ? n - 1 - i : i; });
+    saveTodos(); renderCurrentView();
+    showNotification('已调整顺序', 'success');
 }
 
 function renderVirtualList(container, visible) {
@@ -657,6 +724,11 @@ function bindTaskEl(el, t) {
     if (selCheck) selCheck.addEventListener('change', () => toggleSelect(t.id));
     // 点击卡片主体在多选模式下切换选中
     el.addEventListener('click', () => { if (State.selectMode) toggleSelect(t.id); });
+    // 双击卡片打开编辑（避开操作按钮与子任务勾选区）
+    el.addEventListener('dblclick', (e) => {
+        if (e.target.closest('.task-actions') || e.target.closest('.subtask-list') || e.target.closest('.task-check')) return;
+        openTaskModal(t);
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -1825,13 +1897,6 @@ function syncListSwatches() {
 }
 
 function bindEvents() {
-    // 视图切换
-    document.querySelectorAll('.view-switch button').forEach(b => b.addEventListener('click', () => {
-        State.settings.currentView = b.dataset.view;
-        if (State.settings.showDashboard) State.settings.showDashboard = false;
-        persist.settings(); renderDashboard(); renderCurrentView();
-    }));
-
     // 新建任务
     $('new-task-btn').addEventListener('click', () => openTaskModal(null));
     $('empty-add-btn').addEventListener('click', () => openTaskModal(null));
@@ -1869,10 +1934,29 @@ function bindEvents() {
         syncFilterUI(); renderCurrentView(); showNotification('筛选已清除', 'info');
     });
     $('save-filter').addEventListener('click', () => {
-        const name = prompt('为当前筛选条件命名：');
-        if (!name) return;
-        State.savedFilters.push({ id: uid(), name, criteria: { ...State.filters } });
-        persist.filters(); renderSavedFilters(); showNotification('筛选已保存', 'success');
+        const row = $('save-filter-row');
+        row.classList.remove('hidden');
+        $('save-filter-name').value = '';
+        setTimeout(() => $('save-filter-name').focus(), 30);
+    });
+    const cancelSaveFilter = () => {
+        $('save-filter-row').classList.add('hidden');
+        $('save-filter-name').value = '';
+    };
+    const commitSaveFilter = () => {
+        const name = $('save-filter-name').value.trim();
+        if (!name) { showNotification('请输入筛选名称', 'warning'); $('save-filter-name').focus(); return; }
+        const exist = State.savedFilters.find(f => f.name === name);
+        if (exist) exist.criteria = { ...State.filters };
+        else State.savedFilters.push({ id: uid(), name, criteria: { ...State.filters } });
+        persist.filters(); renderSavedFilters(); cancelSaveFilter();
+        showNotification(exist ? `已更新筛选「${name}」` : `已保存筛选「${name}」`, 'success');
+    };
+    $('save-filter-confirm').addEventListener('click', commitSaveFilter);
+    $('save-filter-cancel').addEventListener('click', cancelSaveFilter);
+    $('save-filter-name').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); commitSaveFilter(); }
+        else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancelSaveFilter(); }
     });
 
     // 多选 / 批量
