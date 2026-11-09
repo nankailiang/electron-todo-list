@@ -1,76 +1,53 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-console.log('Preload script loaded');
-
-// 暴露API给渲染进程
 contextBridge.exposeInMainWorld('electronAPI', {
-    // 待办事项相关
-    getTodos: () => {
-        console.log('preload: getTodos called');
-        return ipcRenderer.invoke('get-todos');
-    },
-    saveTodos: (todos) => {
-        console.log('preload: saveTodos called with', todos.length, 'todos');
-        return ipcRenderer.invoke('save-todos', todos);
-    },
-    addTodo: (todo) => {
-        console.log('preload: addTodo called');
-        return ipcRenderer.invoke('add-todo', todo);
-    },
-    updateTodo: (todo) => {
-        console.log('preload: updateTodo called for id', todo.id);
-        return ipcRenderer.invoke('update-todo', todo);
-    },
-    deleteTodo: (todoId) => {
-        console.log('preload: deleteTodo called for id', todoId);
-        return ipcRenderer.invoke('delete-todo', todoId);
-    },
-    
-    // 导出任务
-    exportTodos: (format) => {
-        console.log('preload: exportTodos called with format', format);
-        return ipcRenderer.invoke('export-todos', format);
-    },
-    
-    // 导入任务
-    importTodos: (options) => {
-        console.log('preload: importTodos called with options', options);
-        return ipcRenderer.invoke('import-todos', options);
-    },
-    
-    // 显示文件选择对话框
-    showOpenDialog: (options) => {
-        console.log('preload: showOpenDialog called');
-        return ipcRenderer.invoke('show-open-dialog', options);
-    },
-    
-    // 打开文件
-    openFile: (filePath) => {
-        console.log('preload: openFile called for path', filePath);
-        return ipcRenderer.invoke('open-file', filePath);
-    },
-    
-    // 获取应用信息
-    getAppInfo: () => {
-        console.log('preload: getAppInfo called');
-        return ipcRenderer.invoke('get-app-info');
-    },
-    
-    // 系统信息
-    getAppPath: (pathName) => {
-        console.log('preload: getAppPath called for', pathName);
-        return ipcRenderer.invoke('get-app-path', pathName);
-    },
-    
-    // 对话框
-    showSaveDialog: (options) => {
-        console.log('preload: showSaveDialog called');
-        return ipcRenderer.invoke('show-save-dialog', options);
-    },
-    showMessageBox: (options) => {
-        console.log('preload: showMessageBox called');
-        return ipcRenderer.invoke('show-message-box', options);
-    }
+    // 任务
+    getTodos: () => ipcRenderer.invoke('get-todos'),
+    saveTodos: (todos) => ipcRenderer.invoke('save-todos', todos),
+    saveTodosSync: (todos) => ipcRenderer.sendSync('save-todos-sync', todos),
+    saveSettingsSync: (settings) => ipcRenderer.sendSync('save-settings-sync', settings),
+
+    // 设置 / 清单 / 保存的筛选
+    getSettings: () => ipcRenderer.invoke('get-settings'),
+    saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
+    getLists: () => ipcRenderer.invoke('get-lists'),
+    saveLists: (lists) => ipcRenderer.invoke('save-lists', lists),
+    getFilters: () => ipcRenderer.invoke('get-filters'),
+    saveFilters: (filters) => ipcRenderer.invoke('save-filters', filters),
+
+    // 加密
+    cryptoStatus: () => ipcRenderer.invoke('crypto-status'),
+    cryptoEnable: (passphrase) => ipcRenderer.invoke('crypto-enable', passphrase),
+    cryptoDisable: (passphrase) => ipcRenderer.invoke('crypto-disable', passphrase),
+    cryptoUnlock: (passphrase) => ipcRenderer.invoke('crypto-unlock', passphrase),
+
+    // 日报
+    getReports: () => ipcRenderer.invoke('get-reports'),
+    saveReports: (reports) => ipcRenderer.invoke('save-reports', reports),
+    generateReport: (date) => ipcRenderer.invoke('generate-report', { date }),
+    exportReport: (payload) => ipcRenderer.invoke('export-report', payload),
+
+    // 通知
+    notify: (payload) => ipcRenderer.invoke('notify', payload),
+
+    // 备份
+    listBackups: () => ipcRenderer.invoke('list-backups'),
+    restoreBackup: (path) => ipcRenderer.invoke('restore-backup', path),
+    backupNow: () => ipcRenderer.invoke('backup-now'),
+
+    // 导入导出
+    exportTodos: (payload) => ipcRenderer.invoke('export-todos', payload),
+    parseImport: (payload) => ipcRenderer.invoke('parse-import', payload),
+    showOpenDialog: (options) => ipcRenderer.invoke('show-open-dialog', options),
+
+    // 杂项
+    openFile: (filePath) => ipcRenderer.invoke('open-file', filePath),
+    getAppInfo: () => ipcRenderer.invoke('get-app-info'),
+    showSaveDialog: (options) => ipcRenderer.invoke('show-save-dialog', options),
+    showMessageBox: (options) => ipcRenderer.invoke('show-message-box', options),
+
+    // 全局快捷键唤起命令面板 / 快捷录入
+    onOpenCommandBar: (cb) => ipcRenderer.on('open-command-bar', (e, mode) => cb(mode))
 });
 
 console.log('Electron API exposed successfully');

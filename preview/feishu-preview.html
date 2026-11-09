@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Todo Manager · 飞书风格预览</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+<link rel="stylesheet" href="styles.css">
+<style>.preview-banner{background:#3370ff;color:#fff;font-size:.8rem;text-align:center;padding:6px;font-family:var(--font);}</style>
+</head>
+<body>
+<div class="preview-banner">这是飞书风格 UI 预览（仅样式演示，数据为本页内置的模拟数据）</div>
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand"><i class="fas fa-circle-check"></i><h1>Todo Manager</h1></div>
+    <div class="sidebar-section-title"><span>清单</span><button title="新建清单"><i class="fas fa-plus"></i></button></div>
+    <div id="list-nav">
+      <div class="list-item active"><span class="dot" style="background:#3370ff"></span>全部任务<span class="count">12</span></div>
+      <div class="list-item"><span class="dot" style="background:#34c724"></span>工作<span class="count">5</span></div>
+      <div class="list-item"><span class="dot" style="background:#ff8800"></span>生活<span class="count">4</span></div>
+      <div class="list-item"><span class="dot" style="background:#f54a45"></span>学习<span class="count">3</span></div>
+    </div>
+    <div class="sidebar-footer">
+      <button class="sidebar-link"><i class="fas fa-chart-pie"></i> 统计面板</button>
+      <button class="sidebar-link"><i class="fas fa-database"></i> 备份与恢复</button>
+      <button class="sidebar-link"><i class="fas fa-gear"></i> 设置</button>
+    </div>
+  </aside>
+  <div class="sidebar-backdrop"></div>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="btn btn-icon btn-ghost menu-toggle"><i class="fas fa-bars"></i></button>
+      <h2><span class="list-color" style="background:#3370ff"></span>全部任务</h2>
+      <div class="view-switch">
+        <button data-view="list" class="active"><i class="fas fa-list"></i> 列表</button>
+        <button data-view="kanban"><i class="fas fa-table-columns"></i> 看板</button>
+        <button data-view="calendar"><i class="fas fa-calendar-days"></i> 日历</button>
+      </div>
+      <button class="btn btn-primary"><i class="fas fa-plus"></i> 新建任务</button>
+    </div>
+
+    <div class="content">
+      <div id="dashboard-wrap">
+        <div class="dashboard" id="dashboard">
+          <div class="metric accent-primary"><div class="metric-label"><i class="fas fa-tasks"></i> 总任务</div><div class="metric-value">12</div><div class="metric-sub">较昨日 +2</div></div>
+          <div class="metric accent-success"><div class="metric-label"><i class="fas fa-check"></i> 已完成</div><div class="metric-value">7</div><div class="metric-sub">完成率 58%</div></div>
+          <div class="metric accent-warning"><div class="metric-label"><i class="fas fa-hourglass-half"></i> 进行中</div><div class="metric-value">3</div><div class="metric-sub">本周 5</div></div>
+          <div class="metric accent-danger"><div class="metric-label"><i class="fas fa-bell"></i> 逾期</div><div class="metric-value">2</div><div class="metric-sub">需关注</div></div>
+        </div>
+        <div class="charts-row">
+          <div class="chart-card"><h4><i class="fas fa-chart-pie"></i> 优先级 / 状态占比</h4><div class="chart-body"><div style="width:120px;height:120px;border-radius:50%;background:conic-gradient(#f54a45 0 25%,#ff8800 0 55%,#bbbfc4 0 100%)"></div><div class="pie-legend"><div class="lg"><span class="sw" style="background:#f54a45"></span>高 3</div><div class="lg"><span class="sw" style="background:#ff8800"></span>中 5</div><div class="lg"><span class="sw" style="background:#bbbfc4"></span>低 4</div></div></div></div>
+          <div class="chart-card"><h4><i class="fas fa-chart-line"></i> 近 7 天完成趋势</h4><div class="chart-body"><svg width="220" height="120" viewBox="0 0 220 120"><polyline fill="none" stroke="#3370ff" stroke-width="3" points="10,90 45,70 80,80 115,50 150,55 185,30 210,25"/><circle cx="210" cy="25" r="4" fill="#3370ff"/></svg></div></div>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <div class="search-box pos-rel"><i class="fas fa-search"></i><input class="form-control" placeholder="搜索任务（支持拼音首字母、模糊匹配）"></div>
+        <div class="chip-select"><label>排序</label><select class="form-control"><option>手动</option><option>优先级</option><option>截止日期</option></select></div>
+        <button class="btn btn-ghost"><i class="fas fa-filter"></i> 筛选</button>
+        <button class="btn btn-ghost"><i class="fas fa-square-check"></i> 多选</button>
+        <div class="chip-select"><label>导入</label><select class="form-control"><option>JSON</option><option>CSV</option></select></div>
+        <div class="chip-select"><label>导出</label><select class="form-control"><option>JSON</option><option>CSV</option></select></div>
+      </div>
+
+      <div class="bulk-bar show">
+        <span class="bulk-count">已选 2 项</span>
+        <button class="btn btn-sm btn-ghost">全选</button>
+        <div class="spacer"></div>
+        <div class="chip-select"><label>状态</label><select class="form-control"><option>改状态</option></select></div>
+        <div class="chip-select"><label>优先级</label><select class="form-control"><option>改优先级</option></select></div>
+        <button class="btn btn-sm btn-secondary"><i class="fas fa-box-archive"></i> 归档</button>
+        <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i> 删除</button>
+        <button class="btn btn-sm btn-ghost">取消</button>
+      </div>
+
+      <div class="task-list" id="task-list">
+        <div class="task-item pr-high pinned">
+          <div class="task-top">
+            <div class="task-check"><input type="checkbox"></div>
+            <div class="task-main">
+              <div class="task-content">完成项目交付演示文稿并同步给团队</div>
+              <div class="task-note-preview">要点：封面、架构图、路线图、风险。</div>
+              <div class="task-badges">
+                <span class="badge pr-high">高</span>
+                <span class="badge date overdue">逾期 07-20</span>
+                <span class="badge tag">工作</span>
+                <span class="badge subtask">子任务 2/3</span>
+              </div>
+              <div class="task-meta-time">创建 07-18 · 开始 07-19</div>
+            </div>
+            <div class="task-actions"><button class="act"><i class="fas fa-pen"></i></button><button class="act"><i class="fas fa-copy"></i></button><button class="act danger"><i class="fas fa-trash"></i></button></div>
+          </div>
+        </div>
+        <div class="task-item pr-medium in-progress">
+          <div class="task-top">
+            <div class="task-check"><input type="checkbox" checked></div>
+            <div class="task-main">
+              <div class="task-content">整理本周周报与待办优先级</div>
+              <div class="task-badges">
+                <span class="badge pr-medium">中</span>
+                <span class="badge date due-soon">07-23 18:00</span>
+                <span class="badge tag">工作</span>
+              </div>
+              <div class="task-meta-time">创建 07-21</div>
+            </div>
+            <div class="task-actions"><button class="act"><i class="fas fa-pen"></i></button><button class="act"><i class="fas fa-copy"></i></button><button class="act danger"><i class="fas fa-trash"></i></button></div>
+          </div>
+        </div>
+        <div class="task-item pr-low">
+          <div class="task-top">
+            <div class="task-check"><input type="checkbox"></div>
+            <div class="task-main">
+              <div class="task-content">买牛奶和水果</div>
+              <div class="task-badges"><span class="badge pr-low">低</span><span class="badge tag">生活</span></div>
+              <div class="task-meta-time">创建 07-22</div>
+            </div>
+            <div class="task-actions"><button class="act"><i class="fas fa-pen"></i></button><button class="act"><i class="fas fa-copy"></i></button><button class="act danger"><i class="fas fa-trash"></i></button></div>
+          </div>
+        </div>
+        <div class="task-item completed">
+          <div class="task-top">
+            <div class="task-check"><input type="checkbox" checked></div>
+            <div class="task-main">
+              <div class="task-content">阅读《深入理解计算机系统》第 3 章</div>
+              <div class="task-badges"><span class="badge status">已完成</span><span class="badge tag">学习</span></div>
+              <div class="task-meta-time">完成 07-20</div>
+            </div>
+            <div class="task-actions"><button class="act"><i class="fas fa-pen"></i></button><button class="act"><i class="fas fa-copy"></i></button><button class="act danger"><i class="fas fa-trash"></i></button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

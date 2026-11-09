@@ -47,3 +47,17 @@ coverage/
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
+
+# Release / extra build outputs
+release/
+dist-*/
+*.blockmap
+
+# Tauri / Rust
+tauri-zhixing/src-tauri/target/
+tauri-zhixing/node_modules/
+target/
+Cargo.lock
+
+# Agent working data
+.workbuddy/

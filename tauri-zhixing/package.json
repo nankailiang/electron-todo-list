@@ -1,0 +1,15 @@
+{
+  "name": "zhixing-tauri",
+  "version": "1.0.0",
+  "private": true,
+  "description": "知行 · 任务与日报工作台（Tauri 2 版）",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:win": "tauri build --target x86_64-pc-windows-msvc"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

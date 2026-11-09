@@ -1,29 +1,29 @@
 {
-  "name": "electron-todo-list",
+  "name": "zhixing",
   "version": "1.0.0",
-  "description": "A simple todo list manager built with Electron",
+  "description": "知行 —— 任务、日报与效率看板一体的桌面工作台（Electron）",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
-    "dev": "electron . --dev",
+    "start": "node electron-launch.js",
+    "dev": "node electron-launch.js --dev",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
-    "dist:win": "electron-builder --win",
-    "dist:mac": "electron-builder --mac",
-    "dist:linux": "electron-builder --linux",
+    "dist:win": "set \"ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/\" && electron-builder --win",
+    "dist:mac": "set \"ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/\" && electron-builder --mac",
+    "dist:linux": "set \"ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/\" && electron-builder --linux",
     "dist:win:quick": "electron-builder --win --publish never"
   },
-  "keywords": ["electron", "todo", "manager", "desktop"],
-  "author": "Your Name",
+  "keywords": ["electron", "todo", "daily-report", "kanban", "desktop", "zhixing"],
+  "author": "Zhixing",
   "license": "MIT",
   "devDependencies": {
     "electron": "^39.2.3",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "^26.15.3"
   },
   "build": {
-    "appId": "com.example.todolist",
-    "productName": "Todo List Manager",
-    "copyright": "Copyright © 2025 ${author}",
+    "appId": "com.zhixing.app",
+    "productName": "知行",
+    "copyright": "Copyright © 2026 Zhixing",
     "directories": {
       "output": "dist",
       "buildResources": "assets"
@@ -49,18 +49,17 @@
           "arch": ["x64", "ia32"]
         }
       ],
-      "publisherName": "Todo List Manager",
-      "legalTrademarks": "Todo List Manager",
+      "legalTrademarks": "知行",
       "requestedExecutionLevel": "asInvoker",
-      "icon": "assets/icon.png"
+      "icon": "assets/icon.ico"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Todo List Manager",
-      "uninstallDisplayName": "Todo List Manager",
+      "shortcutName": "知行",
+      "uninstallDisplayName": "知行",
       "deleteAppDataOnUninstall": false,
       "allowElevation": true,
       "installerLanguages": ["zh_CN"],
