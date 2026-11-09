@@ -22,27 +22,62 @@ tauri-zhixing/
 ```
 
 ## 环境准备（Windows 只支持 MSVC 工具链）
-1. 安装 **Microsoft C++ 生成工具**（VS Build Tools 2022，勾选「使用 C++ 的桌面开发」/ VCTools 工作负载）：
-   ```powershell
-   winget install --id Microsoft.VisualStudio.2022.BuildTools -e --override "--wait --quiet --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
-   ```
-   > 注意：该安装器需要**有交互桌面 / 管理员**，在纯 headless 的 CI/沙箱里会报 5002 起不来。
-2. 安装 Rust 的 **MSVC** 工具链并设为默认：
-   ```powershell
+
+> 本节是 2026-11 在本机（Windows 10 19045，非管理员账号 + 管理员组）**实测通过**的步骤，三样工具全部装在 D 盘。
+
+1. **Rust 工具链**（装到 D 盘，走国内镜像）
+   ```bash
+   # 设 RUSTUP_HOME=D:\dev\rust\rustup、CARGO_HOME=D:\dev\rust\cargo 后再执行
+   rustup-init.exe -y --default-host x86_64-pc-windows-msvc --no-modify-path
    rustup toolchain install stable-x86_64-pc-windows-msvc
-   rustup default stable-x86_64-pc-windows-msvc
+   rustup update stable
    ```
-3. 确认系统已装 **WebView2**（Win11 自带；Win10 装了 Edge 即有；否则装 “Microsoft Edge WebView2 Runtime”）。
+   - 加速：`RUSTUP_DIST_SERVER=https://rsproxy.cn`、`RUSTUP_UPDATE_ROOT=https://rsproxy.cn/rustup`
+   - crates 镜像写在 `%CARGO_HOME%\config.toml`：`[source.crates-io] replace-with = 'rsproxy-sparse'`
+   - 把 `%CARGO_HOME%\bin` 加进用户 PATH，并把 `RUSTUP_HOME`、`CARGO_HOME` 设为用户环境变量（否则换终端就找不到 cargo）
+
+2. **MSVC 生成工具 + Windows SDK**
+   ```powershell
+   winget install --id Microsoft.VisualStudio.2022.BuildTools --source winget `
+     --accept-package-agreements --accept-source-agreements --disable-interactivity `
+     --override "--quiet --wait --norestart --installPath D:\dev\VSBuildTools --path shared=D:\dev\VSBuildShared --path cache=D:\dev\VSCache --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+   ```
+   - 必须加 `--source winget`，否则会去连 msstore 源并报证书错误。
+   - **不要直接跑 vs_BuildTools.exe**：本机上它的 .NET 下载器会卡在 `vs_installer.opc` 上（零字节、无超时），换 winget 触发就正常。
+   - `--path shared=` 能把 MSVC 和大头组件指到 D 盘；但 **Windows SDK 会被微软强制装到 `C:\Program Files (x86)\Windows Kits\10`**（官方文档明示的例外），约 2 GB，无法改。
+   - 安装可能以退出码 **1603** 结束（个别 resources MSI 装不上），只要 `cl.exe` / `link.exe` / SDK 的 `rc.exe` 都在，编译不受影响。
+
+3. **WebView2 运行时**：Win11 自带；Win10 装了 Edge 即有。本机已装 157.x。
+
+装完自查：
+```bash
+ls D:/dev/VSBuildTools/VC/Tools/MSVC/*/bin/Hostx64/x64/cl.exe
+ls "C:/Program Files (x86)/Windows Kits/10/bin"/*/x64/rc.exe
+```
 
 ## 构建
 ```powershell
 cd tauri-zhixing
-npm install            # 安装 @tauri-apps/cli
+npm install            # 安装 @tauri-apps/cli（约 2 个包）
 npm run build          # = tauri build，产物在 src-tauri/target/release/bundle/
 ```
 开发调试：`npm run dev`（= tauri dev）。
+只想快速验证能不能编：`cd src-tauri && cargo build`（debug，约 15 分钟首次）。
 
-产物：`src-tauri/target/release/bundle/nsis/知行_1.0.0_x64-setup.exe`，预计 **10–20MB**（对比 Electron 双架构 167MB）。
+产物：`src-tauri/target/release/bundle/nsis/知行_1.0.0_x64-setup.exe`，**实测 1.3 MB**（对比 Electron 双架构 182 MB），主程序 `zhixing.exe` 3.7 MB / 运行内存约 23 MB。
+
+> 首次 `tauri build` 的 release 编译约 **21 分钟**（`Cargo.toml` 开了 `lto = true` + `codegen-units = 1`），增量重编只要几秒。调试用 `cargo build` 首次约 15 分钟。
+
+### NSIS 组件下载失败怎么办
+国内网络下 `tauri build` 常卡在 `Downloading .../nsis-3.13.zip`（502/超时）。Tauri 会校验 `%LOCALAPPDATA%\tauri\NSIS`，少一个文件就整个删掉重下，所以必须按这个结构手动放好：
+
+```
+%LOCALAPPDATA%\tauri\NSIS\
+├─ Bin\makensis.exe                    ← nsis-3.13.zip 解压（去掉外层 nsis-3.13 目录）
+└─ Plugins\x86-unicode\
+   ├─ ApplicationID.dll                ← NSIS-ApplicationID.zip 里的 Release/ApplicationID.dll
+   └─ additional\nsis_tauri_utils.dll  ← 注意 additional 子目录，放根目录不认
+```
 
 ## 与 Electron 版的对应关系
 | Electron (main.js) | Tauri (src-tauri/src/main.rs) |

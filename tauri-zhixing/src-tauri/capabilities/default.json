@@ -6,7 +6,6 @@
     "core:default",
     "dialog:default",
     "notification:default",
-    "global-shortcut:default",
-    "single-instance:default"
+    "global-shortcut:default"
   ]
 }

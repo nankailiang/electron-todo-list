@@ -366,7 +366,10 @@ fn to_markdown(todos: &Vec<Value>) -> String {
                 let dt = s_or(t, "dueTime", "");
                 metas.push(format!("📅 {}{}", date, if dt.is_empty() { "".into() } else { format!(" {}", dt) }));
             }
-            let pr = pr_cn(&s_or(t, "priority", ""));
+            let pr = {
+                let p = s_or(t, "priority", "");
+                pr_cn(&p).to_string()
+            };
             if !pr.is_empty() {
                 metas.push(format!("🚩 {}", pr));
             }
@@ -401,11 +404,21 @@ fn normalize_todo(t: &Value) -> Option<Value> {
         if ["high", "medium", "low"].contains(&p.as_str()) { p } else { "medium".into() }
     };
     let now = chrono::Utc::now().to_rfc3339();
+    // json! 宏内不能直接写 if let / 语句块，先求值再塞进去
+    let id = if let Some(id) = t.get("id").and_then(|v| v.as_str()) {
+        id.to_string()
+    } else {
+        format!("{}{}", chrono::Utc::now().timestamp_millis(), rand::random::<u32>())
+    };
+    let date = {
+        let d = s_or(t, "date", "");
+        if d.is_empty() { chrono::Local::now().format("%Y-%m-%d").to_string() } else { d }
+    };
     Some(json!({
-        "id": if let Some(id)=t.get("id").and_then(|v|v.as_str()) { id.to_string() } else { format!("{}{}", chrono::Utc::now().timestamp_millis(), rand::random::<u32>()) },
+        "id": id,
         "listId": s_or(t, "listId", "default"),
         "startDate": s_or(t, "startDate", ""),
-        "date": { let d=s_or(t,"date",""); if d.is_empty(){ chrono::Local::now().format("%Y-%m-%d").to_string() } else { d } },
+        "date": date,
         "dueTime": s_or(t, "dueTime", ""),
         "priority": priority,
         "content": content.trim(),

@@ -55,6 +55,7 @@ dist-*/
 
 # Tauri / Rust
 tauri-zhixing/src-tauri/target/
+tauri-zhixing/src-tauri/gen/
 tauri-zhixing/node_modules/
 target/
 Cargo.lock
