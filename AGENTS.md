@@ -107,12 +107,16 @@ backups/          # 每日备份 todo-backup-YYYY-MM-DD.json，保留 7 天（�
 ---
 
 ## 9. Tauri 2 版（tauri-zhixing/）
-- 目的：验证“更小体积/更快启动”。**前端 100% 复用**：`tauri-zhixing/ui/` = 拷贝的 index/styles/app.js + 新增 `tauri-api.js`（把 `window.electronAPI` 映射到 Tauri `invoke`，用 `withGlobalTauri` 免打包）。
+- 目的：验证“更小体积/更快启动”。**前端 100% 复用**：`tauri-zhixing/ui/` 里 `app.js`/`styles.css`/`index.html` 由 `scripts/sync-ui.mjs` 从**根目录**生成（根目录是唯一真源），另加手写的 `tauri-api.js`（把 `window.electronAPI` 映射到 Tauri `invoke`，用 `withGlobalTauri` 免打包）。
+- **改界面只改根目录**，然后 `npm run sync-ui`；`npm run dev` / `npm run build` 会自动先同步。直接 `npx tauri build` 或 `cargo build` 不触发同步，会用到旧副本——改了前端就必须先同步。`npm run sync-ui:check` 可校验一致性（不一致退出码 1）。
+- 同步规则：`app.js`/`styles.css` 原样复制；`index.html` 复制后在 `<script src="app.js">` 前注入 `<script src="tauri-api.js">`（顺序敏感）。脚本保留 CRLF 与原缩进；找不到锚点会直接报错退出，不会静默产出坏文件。
 - 后端：`src-tauri/src/main.rs` 用 `#[tauri::command]` 实现上表所有通道；插件 dialog/notification/global-shortcut/single-instance；加密同算法（aes-gcm+scrypt，`ENC1` 格式兼容）。
 - 配置：`frontendDist=../ui`、`withGlobalTauri=true`、`capabilities/default.json` 权限、`icons/`。
 - **构建前置**：Windows 需 **MSVC 工具链**（VS Build Tools 的 C++ 生成工具）+ `rustup default stable-x86_64-pc-windows-msvc` + WebView2。`cargo build` 会因缺链接器失败于无 MSVC 环境；**GNU(mingw) 目标 Tauri 不支持**。
-- 体积预期：nsis 安装包约 10–20MB（对比 Electron 双架构 167MB）。详见 `tauri-zhixing/README.md`。
-- 未完全验证：沙箱无 MSVC/GUI 安装器，未实机编译过；逻辑已按 main.js 对齐。
+- 体积实测：nsis 安装包 **1.3 MB**、主程序 3.7 MB、运行内存 ~23 MB（对比 Electron 182 MB / 202 MB / ~140 MB）。
+- **便携版**：Tauri 无 `portable` 打包目标，但 release 的 `target/release/zhixing.exe` 已内嵌前端资源，本身就是免安装单文件程序。`npm run portable` 把它复制成 `dist-portable/知行 1.0.0.exe`；`npm run build:portable` 一条龙。依赖系统 WebView2；数据仍在 `%APPDATA%\com.zhixing.app\`（不是绿色软件，数据不跟随 exe）。
+- 编译耗时：`lto=true` + `codegen-units=1`，首次 release 约 21 分钟，增量几秒；真正出安装包仅 ~18 秒。
+- 已在 Windows 10 19045 实机编译并打包验证通过。详见 `tauri-zhixing/README.md`。
 
 ---
 

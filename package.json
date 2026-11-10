@@ -11,7 +11,12 @@
     "dist:win": "set \"ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/\" && electron-builder --win",
     "dist:mac": "set \"ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/\" && electron-builder --mac",
     "dist:linux": "set \"ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/\" && electron-builder --linux",
-    "dist:win:quick": "electron-builder --win --publish never"
+    "dist:win:quick": "electron-builder --win --publish never",
+    "sync-ui": "node tauri-zhixing/scripts/sync-ui.mjs",
+    "sync-ui:check": "node tauri-zhixing/scripts/sync-ui.mjs --check",
+    "tauri:dev": "npm --prefix tauri-zhixing run dev",
+    "tauri:build": "npm --prefix tauri-zhixing run build",
+    "tauri:portable": "npm --prefix tauri-zhixing run build:portable"
   },
   "keywords": ["electron", "todo", "daily-report", "kanban", "desktop", "zhixing"],
   "author": "Zhixing",

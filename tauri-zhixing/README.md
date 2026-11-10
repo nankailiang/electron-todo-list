@@ -3,15 +3,18 @@
 这是用 **Tauri 2** 复刻 Electron 版的实验工程，用于对比体积/性能。
 前端（`index.html` / `styles.css` / `app.js`）**与 Electron 版完全一致**，仅新增 `tauri-api.js` 把 `window.electronAPI` 适配到 Tauri 命令。后端 `src-tauri/src/main.rs` 是 `main.js` 的 Rust 迁移。
 
+> **前端不要手改**：`ui/` 下的 `app.js`、`styles.css`、`index.html` 由 `scripts/sync-ui.mjs` 从仓库根目录生成（唯一真源是根目录）。改界面请改根目录那份，然后 `npm run sync-ui`——`npm run dev` / `npm run build` 会自动先同步。
+
 ## 目录
 ```
 tauri-zhixing/
 ├─ package.json            # 仅用于 @tauri-apps/cli
+├─ scripts/sync-ui.mjs     # 把根目录前端同步到 ui/（index.html 额外注入 tauri-api.js）
 ├─ ui/                     # 前端（复用 Electron 版）
-│  ├─ index.html
-│  ├─ styles.css
-│  ├─ app.js
-│  └─ tauri-api.js         # window.electronAPI → Tauri invoke 适配层
+│  ├─ index.html           # ← 自动生成，勿手改
+│  ├─ styles.css           # ← 自动生成，勿手改
+│  ├─ app.js               # ← 自动生成，勿手改
+│  └─ tauri-api.js         # 手写：window.electronAPI → Tauri invoke 适配层
 └─ src-tauri/
    ├─ Cargo.toml
    ├─ build.rs
@@ -59,12 +62,39 @@ ls "C:/Program Files (x86)/Windows Kits/10/bin"/*/x64/rc.exe
 ```powershell
 cd tauri-zhixing
 npm install            # 安装 @tauri-apps/cli（约 2 个包）
-npm run build          # = tauri build，产物在 src-tauri/target/release/bundle/
+npm run build          # 先同步 ui/，再 tauri build，产物在 src-tauri/target/release/bundle/
 ```
-开发调试：`npm run dev`（= tauri dev）。
+开发调试：`npm run dev`（= 同步 ui/ + tauri dev）。
+
+| 命令 | 作用 |
+|---|---|
+| `npm run sync-ui` | 手动把根目录前端同步到 `ui/` |
+| `npm run sync-ui:check` | 只校验是否一致，不一致退出码 1（适合挂 CI） |
+| `npm run portable` | 从已有 release 产物生成便携版（免安装），不重新编译 |
+| `npm run build:portable` | 同步 + 编译 + 打包安装包 + 生成便携版，一条龙 |
+| `npm run build:win` | 显式指定 `x86_64-pc-windows-msvc` |
+
+> ⚠️ 直接 `npx tauri build` 或 `cd src-tauri && cargo build` **不会**触发同步。如果改了根目录前端又用这两种方式打包，会用到旧的 `ui/`。要么先跑 `npm run sync-ui`，要么统一用 `npm run build`。
+
 只想快速验证能不能编：`cd src-tauri && cargo build`（debug，约 15 分钟首次）。
 
 产物：`src-tauri/target/release/bundle/nsis/知行_1.0.0_x64-setup.exe`，**实测 1.3 MB**（对比 Electron 双架构 182 MB），主程序 `zhixing.exe` 3.7 MB / 运行内存约 23 MB。
+
+### 便携版（免安装）
+
+Tauri 的 bundler 只有 `msi` / `nsis` 两个 Windows 目标，**没有** electron-builder 那种 `portable` 目标。但不需要——release 出来的 `zhixing.exe` 本身就把前端资源编进了可执行文件，是**真正独立的单文件程序**，复制到任何位置双击即可运行。
+
+```powershell
+npm run build        # 先构建一次
+npm run portable     # 复制成 dist-portable\知行 1.0.0.exe
+# 或者一条龙：npm run build:portable
+```
+
+实测结论：
+- 复制到空目录单独运行正常，窗口标题、WebView2 渲染都正常，**同目录不需要任何附属文件**，也不会在 exe 旁边生成文件。
+- 版本信息已嵌入（`ProductName=知行`、`FileVersion=1.0.0`），资源管理器属性里能看到。
+- **依赖系统 WebView2 运行时**：Win11 自带；Win10 装过 Edge 即有。裸机没装会直接打不开、也没有友好提示——这种情况请用安装包（NSIS 会引导安装 WebView2）。
+- **数据不在 exe 旁边**，在 `%APPDATA%\com.zhixing.app\`，与安装版共用同一份数据。所以它「免安装」但不「绿色」：换台机器拷 exe 过去，任务是空的。真要随身携带数据，需要改 Rust 侧把 `app_data_dir()` 换成一个「exe 同目录 / 便携标记」的判断，目前没做。
 
 > 首次 `tauri build` 的 release 编译约 **21 分钟**（`Cargo.toml` 开了 `lto = true` + `codegen-units = 1`），增量重编只要几秒。调试用 `cargo build` 首次约 15 分钟。
 

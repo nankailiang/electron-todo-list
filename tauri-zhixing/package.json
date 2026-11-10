@@ -5,9 +5,13 @@
   "description": "知行 · 任务与日报工作台（Tauri 2 版）",
   "scripts": {
     "tauri": "tauri",
-    "dev": "tauri dev",
-    "build": "tauri build",
-    "build:win": "tauri build --target x86_64-pc-windows-msvc"
+    "sync-ui": "node scripts/sync-ui.mjs",
+    "sync-ui:check": "node scripts/sync-ui.mjs --check",
+    "portable": "node scripts/make-portable.mjs",
+    "dev": "node scripts/sync-ui.mjs --quiet && tauri dev",
+    "build": "node scripts/sync-ui.mjs --quiet && tauri build",
+    "build:win": "node scripts/sync-ui.mjs --quiet && tauri build --target x86_64-pc-windows-msvc",
+    "build:portable": "node scripts/sync-ui.mjs --quiet && tauri build && node scripts/make-portable.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"
