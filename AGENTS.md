@@ -137,6 +137,20 @@ backups/          # 每日备份 todo-backup-YYYY-MM-DD.json，保留 7 天（�
 
 ---
 
-## 12. 下一步建议（未做）
+## 12. 历史数据补录（tools/backfill-import.mjs）
+- 场景：把以前的待办/日报批量补进应用。应用内导入只覆盖**任务**（json/csv/txt/md），**日报没有导入入口**，所以需要这个脚本。
+- 用法：`npm run import-data -- --tasks a.csv --reports b.csv`（默认演练不写盘）→ 加 `--write` 执行；`--data-dir` 指定目录，`--passphrase` 处理加密，`--on-conflict skip|overwrite` 处理重复。
+- 关键实现点（改这个脚本时注意）：
+  - 判重：任务优先按 `id`；没给 id 时按 `content+date+status`；日报按 `date`（一天一篇）。
+  - 加密：完全复刻 main.js（`scryptSync(pass, salt, 32)` + `aes-256-gcm` + `ENC1:iv:tag:data`），读到密文必须给口令，写回保持密文。
+  - 编码：先按严格 UTF-8 解，失败回落 GBK（Excel 存 CSV 默认 GBK）；剥 BOM。
+  - 写盘前把 `todoList.json`/`reports.json` 备份到 `backups/import-<ts>/`，再原子写。
+  - 缺省日期用**本地**今天（别用 `toISOString`）。
+- 重要语义：统计（今日/本周完成、趋势图、平均耗时）全部按 **`completedAt`** 归日，`startedAt`+`completedAt` 齐全才有耗时。所以补录历史已完成任务必须填 `completedAt`，否则列表里有、图表里没有。
+- 文档：`docs/数据补录指南.md`（字段表、模板、日期规则、判重、FAQ）。CSV 模板在 `tools/templates/`（带 BOM，方便 Excel 直接打开）。
+
+---
+
+## 13. 下一步建议（未做）
 - 番茄钟 + 专注时长统计；习惯打卡(streak)；艾森豪威尔四象限视图；任务预计时长+容量超载预警；任务活动日志；指定“每周几”重复；语音录入；云同步/多端。
 - Electron 想更小：`win.target.arch` 只留 `x64`（约砍到 ~85MB）+ `compression: maximum`。

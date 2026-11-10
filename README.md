@@ -81,6 +81,9 @@ electron-todo-list/
 ├── app.js                # 渲染进程逻辑（状态管理、视图渲染、交互）
 ├── package.json          # 项目配置
 ├── assets/               # 静态资源
+├── tools/                # 辅助工具：历史数据补录脚本 + CSV 模板
+├── docs/                 # 文档（数据补录指南等）
+├── tauri-zhixing/        # Tauri 2 版实验工程
 ├── README.md             # 项目说明
 ├── INSTALL_CONFIG.md     # 安装和打包配置
 └── dist/                 # 打包输出目录
@@ -128,6 +131,22 @@ electron-todo-list/
 ```
 
 > `repeat.type` 取 `none | daily | weekly | monthly | custom`；`custom` 时 `interval` 为间隔天数。
+
+## 历史数据补录
+
+想把以前的待办和日报一次性补进应用，用命令行工具（任务 + 日报都支持；应用内导入只支持任务）：
+
+```bash
+# 先演练，只打印将发生什么，不写盘
+npm run import-data -- --tasks 我的任务.csv --reports 我的日报.csv
+
+# 确认无误后写入（自动备份原数据）
+npm run import-data -- --tasks 我的任务.csv --reports 我的日报.csv --write
+```
+
+CSV 模板在 `tools/templates/`。完整字段说明、日期规则、判重逻辑、加密与常见问题见 **[docs/数据补录指南.md](docs/数据补录指南.md)**。
+
+> 导入前请先完全退出应用，否则内存中的旧数据会在下次保存时覆盖导入结果。
 
 ## 应用打包指南
 
