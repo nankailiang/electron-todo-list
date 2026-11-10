@@ -281,6 +281,25 @@ textarea.form-control { min-height: 70px; resize: vertical; }
 select.form-control { cursor: pointer; }
 input[type="color"].form-control { padding: 3px; }
 
+/* ==== 完成度 ==== */
+.progress-val { margin-left: 6px; color: var(--info); font-weight: 700; font-variant-numeric: tabular-nums; }
+.progress-edit { display: flex; align-items: center; gap: 12px; }
+.progress-range { flex: 1; -webkit-appearance: none; appearance: none; height: 6px; border-radius: var(--radius-pill); background: var(--surface-3); outline: none; cursor: pointer; }
+.progress-range::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 17px; height: 17px; border-radius: 50%;
+    background: var(--primary); border: 2px solid var(--surface); box-shadow: 0 1px 5px rgba(0, 0, 0, 0.22); cursor: pointer;
+}
+.progress-range::-moz-range-thumb { width: 15px; height: 15px; border-radius: 50%; background: var(--primary); border: 2px solid var(--surface); cursor: pointer; }
+.progress-num { width: 78px; text-align: center; padding: 10px 6px; font-variant-numeric: tabular-nums; }
+.progress-presets { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.preset-btn {
+    border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
+    border-radius: var(--radius-pill); padding: 4px 13px; font-size: 0.76rem; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+}
+.preset-btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
+.form-hint { font-size: 0.74rem; color: var(--text-3); margin-top: 8px; line-height: 1.5; }
+
 /* ==== 按钮 ==== */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 18px; border: none; border-radius: var(--radius-pill); font-size: 0.87rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; white-space: nowrap; letter-spacing: 0.01em; }
 .btn:active { transform: scale(0.97); }
@@ -382,6 +401,16 @@ input[type="color"].form-control { padding: 3px; }
 .badge.status.st-in-progress { color: var(--info); }
 .badge.status.st-pending { color: var(--text-3); }
 .badge.subtask { background: var(--surface-3); color: var(--text-2); }
+
+/* 在办任务完成度进度条（点击/拖动轨道调整） */
+.task-progress { display: flex; align-items: center; gap: 9px; margin-top: 9px; max-width: 320px; cursor: pointer; user-select: none; }
+.task-progress .tp-track { flex: 1; height: 6px; border-radius: var(--radius-pill); background: var(--surface-3); overflow: hidden; transition: background 0.15s; }
+.task-progress:hover .tp-track { background: var(--info-soft); }
+.task-progress .tp-fill { height: 100%; border-radius: var(--radius-pill); background: linear-gradient(90deg, var(--info), #7CC0E8); transition: width 0.12s ease; }
+.task-progress .tp-num { font-size: 0.72rem; font-weight: 700; color: var(--info); min-width: 36px; text-align: right; font-variant-numeric: tabular-nums; }
+.task-progress.compact { margin-top: 8px; max-width: none; gap: 7px; }
+.task-progress.compact .tp-track { height: 5px; }
+.task-progress.compact .tp-num { font-size: 0.68rem; min-width: 30px; }
 
 .task-meta-time { font-size: 0.72rem; color: var(--text-3); margin-top: 6px; }
 

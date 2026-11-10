@@ -178,6 +178,22 @@ fn s_or<'a>(v: &'a Value, k: &str, d: &'a str) -> String {
     v.get(k).and_then(|x| x.as_str()).unwrap_or(d).to_string()
 }
 
+/// 完成度：0~100，结办一律 100；容忍 "30%" 这类脏值
+fn progress_of(t: &Value) -> i64 {
+    if s_or(t, "status", "") == "completed" {
+        return 100;
+    }
+    let raw = t.get("progress").and_then(|v| {
+        if let Some(n) = v.as_f64() {
+            Some(n)
+        } else {
+            v.as_str()
+                .and_then(|s| s.trim().trim_end_matches('%').parse::<f64>().ok())
+        }
+    });
+    raw.unwrap_or(0.0).round().clamp(0.0, 100.0) as i64
+}
+
 fn build_report_summary(todos: &Value, date: &str) -> Value {
     let scope = arr(todos);
     let due: Vec<&Value> = scope
@@ -206,7 +222,7 @@ fn build_report_summary(todos: &Value, date: &str) -> Value {
         })
         .collect();
 
-    let lines = |a: &Vec<&Value>, label: &str| -> String {
+    let lines = |a: &Vec<&Value>, label: &str, with_progress: bool| -> String {
         if a.is_empty() {
             return format!("## {}\n（无）\n", label);
         }
@@ -214,10 +230,15 @@ fn build_report_summary(todos: &Value, date: &str) -> Value {
             .iter()
             .map(|t| {
                 let dt = s_or(t, "dueTime", "");
-                if dt.is_empty() {
-                    format!("- {}", s_or(t, "content", ""))
+                let pct = if with_progress && s_or(t, "status", "") == "in-progress" {
+                    format!("（完成度 {}%）", progress_of(t))
                 } else {
-                    format!("- {} {}", s_or(t, "content", ""), dt)
+                    String::new()
+                };
+                if dt.is_empty() {
+                    format!("- {}{}", s_or(t, "content", ""), pct)
+                } else {
+                    format!("- {} {}{}", s_or(t, "content", ""), dt, pct)
                 }
             })
             .collect::<Vec<_>>()
@@ -228,10 +249,10 @@ fn build_report_summary(todos: &Value, date: &str) -> Value {
     let default_content = format!(
         "# 工作日报（{}）\n\n{}{}{}{}## 明日计划\n- \n",
         date,
-        lines(&completed, "今日完成"),
-        lines(&in_progress, "进行中"),
-        lines(&pending, "待处理"),
-        lines(&overdue, "逾期未完成")
+        lines(&completed, "今日完成", false),
+        lines(&in_progress, "进行中", true),
+        lines(&pending, "待处理", false),
+        lines(&overdue, "逾期未完成", false)
     );
     let pick = |t: &Value| {
         json!({
@@ -241,7 +262,8 @@ fn build_report_summary(todos: &Value, date: &str) -> Value {
             "listId": s_or(t, "listId", ""),
             "status": s_or(t, "status", ""),
             "date": s_or(t, "date", ""),
-            "dueTime": s_or(t, "dueTime", "")
+            "dueTime": s_or(t, "dueTime", ""),
+            "progress": progress_of(t)
         })
     };
     json!({
@@ -272,7 +294,7 @@ fn csv_escape(s: &str) -> String {
 fn to_csv(todos: &Vec<Value>) -> String {
     let headers = [
         "id", "listId", "startDate", "date", "dueTime", "priority", "content", "note", "status",
-        "tags", "createdAt", "startedAt", "completedAt",
+        "progress", "tags", "createdAt", "startedAt", "completedAt",
     ];
     let mut out = String::from(headers.join(","));
     out.push('\n');
@@ -292,6 +314,7 @@ fn to_csv(todos: &Vec<Value>) -> String {
             csv_escape(&s_or(t, "content", "")),
             csv_escape(&s_or(t, "note", "")),
             s_or(t, "status", ""),
+            progress_of(t).to_string(),
             csv_escape(&tags),
             s_or(t, "createdAt", ""),
             s_or(t, "startedAt", ""),
@@ -326,11 +349,17 @@ fn to_txt(todos: &Vec<Value>) -> String {
         "-".repeat(50)
     );
     for (i, t) in todos.iter().enumerate() {
+        let pct = if s_or(t, "status", "") == "in-progress" {
+            format!("（完成度 {}%）", progress_of(t))
+        } else {
+            String::new()
+        };
         out.push_str(&format!(
-            "{}. [{}] {}\n",
+            "{}. [{}] {}{}\n",
             i + 1,
             status_cn(&s_or(t, "status", "")),
-            s_or(t, "content", "")
+            s_or(t, "content", ""),
+            pct
         ));
         out.push_str(&format!("   日期: {}{}\n", s_or(t, "date", ""), {
             let dt = s_or(t, "dueTime", "");
@@ -361,6 +390,9 @@ fn to_markdown(todos: &Vec<Value>) -> String {
             let box_ = if group == "completed" { "[x]" } else { "[ ]" };
             let mut line = format!("- {} **{}**", box_, s_or(t, "content", ""));
             let mut metas: Vec<String> = vec![];
+            if group == "in-progress" {
+                metas.push(format!("完成度 {}%", progress_of(t)));
+            }
             let date = s_or(t, "date", "");
             if !date.is_empty() {
                 let dt = s_or(t, "dueTime", "");
@@ -399,6 +431,7 @@ fn normalize_todo(t: &Value) -> Option<Value> {
         let s = s_or(t, "status", "pending");
         if ["pending", "in-progress", "completed"].contains(&s.as_str()) { s } else { "pending".into() }
     };
+    let progress = if status == "completed" { 100 } else { progress_of(t) };
     let priority = {
         let p = s_or(t, "priority", "medium");
         if ["high", "medium", "low"].contains(&p.as_str()) { p } else { "medium".into() }
@@ -424,6 +457,7 @@ fn normalize_todo(t: &Value) -> Option<Value> {
         "content": content.trim(),
         "note": s_or(t, "note", ""),
         "status": status,
+        "progress": progress,
         "tags": tags,
         "subtasks": t.get("subtasks").cloned().unwrap_or(json!([])),
         "pinned": t.get("pinned").and_then(|v|v.as_bool()).unwrap_or(false),

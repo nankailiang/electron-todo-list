@@ -111,7 +111,8 @@ electron-todo-list/
 {
   "id": "1620000000000",
   "content": "完成项目开发",
-  "status": "pending",
+  "status": "in-progress",
+  "progress": 40,
   "priority": "high",
   "date": "2025-11-22",
   "startDate": "",
@@ -131,6 +132,8 @@ electron-todo-list/
 ```
 
 > `repeat.type` 取 `none | daily | weekly | monthly | custom`；`custom` 时 `interval` 为间隔天数。
+>
+> `progress` 是 0~100 的整数完成度：只在「在办（in-progress）」任务上展示进度条（卡片上可点击/拖动轨道调整，编辑框里也有滑块和数字框）；标记结办时自动记为 100%，重新打开（改回待办）时归零。
 
 ## 历史数据补录
 

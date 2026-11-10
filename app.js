@@ -117,6 +117,21 @@ function localISO(d = new Date()) {
 }
 function isoAddDays(iso, n) { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return localISO(d); }
 function mondayISO(iso) { const d = new Date(iso + 'T00:00:00'); const day = d.getDay(); d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day)); return localISO(d); }
+
+// ---- 完成度（0~100 整数）----
+// 语义：只在「在办」任务上展示和调整；结办一律视为 100%，待办视为 0%。
+// 待办任务里保留的 progress 不会展示，但「开始」后会接着用，方便先预估。
+function clampProgress(v) {
+    const n = Math.round(Number(v));
+    return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0;
+}
+function storedProgress(t) { return t ? clampProgress(t.progress) : 0; }
+function taskProgress(t) {
+    if (!t) return 0;
+    if (t.status === 'completed') return 100;
+    if (t.status !== 'in-progress') return 0;
+    return storedProgress(t);
+}
 function dayNum(iso) { return parseInt(iso.slice(8, 10), 10); }
 function fmtMD(iso) { const p = iso.split('-'); return `${parseInt(p[1], 10)}月${parseInt(p[2], 10)}日`; }
 // 把 UTC 时间戳按其本地日期归日（用于完成时间统计分组）
@@ -243,6 +258,9 @@ function migrateData() {
         }
         if (t.startedAt === undefined) { t.startedAt = t.status === 'in-progress' ? (t.updatedAt || null) : null; changed = true; }
         if (t.completedAt === undefined) { t.completedAt = t.status === 'completed' ? (t.updatedAt || null) : null; changed = true; }
+        // 完成度：旧数据补 0；结办任务统一按 100%
+        const p = t.status === 'completed' ? 100 : (t.progress === undefined ? 0 : clampProgress(t.progress));
+        if (t.progress !== p) { t.progress = p; changed = true; }
     });
     if (changed) saveTodos();
 }
@@ -300,6 +318,7 @@ function spawnRecurring(task) {
         date: nextDate,
         recurPrevId: task.id,
         status: 'pending',
+        progress: 0,
         pinned: task.pinned,
         subtasks: (task.subtasks || []).map(s => ({ ...s, done: false })),
         createdAt: new Date().toISOString(),
@@ -675,6 +694,7 @@ function createTaskEl(t) {
                     <span class="badge status st-${t.status}">${I('circle')} ${STATUS[t.status]}</span>
                     ${startBadge}${dateBadge}${listBadge}${subBadge}${repeatBadge}${tagBadges}
                 </div>
+                ${progressBarHtml(t)}
                 ${timeMeta}
             </div>
             <div class="task-actions">
@@ -707,6 +727,24 @@ function renderSubtaskList(t) {
         </label>`).join('')}</div>`;
 }
 
+// 在办任务的完成度进度条；点击轨道即可直接定位百分比
+function progressBarHtml(t, compact) {
+    if (t.status !== 'in-progress') return '';
+    const p = taskProgress(t);
+    return `<div class="task-progress${compact ? ' compact' : ''}" data-progress-bar
+        title="完成度 ${p}%，点击进度条可直接调整">
+        <div class="tp-track"><div class="tp-fill" style="width:${p}%"></div></div>
+        <span class="tp-num">${p}%</span>
+    </div>`;
+}
+
+// 把点击/拖动位置换算成百分比（0~100）
+function progressFromPointer(e, track) {
+    const rect = track.getBoundingClientRect();
+    if (!rect.width) return 0;
+    return clampProgress((e.clientX - rect.left) / rect.width * 100);
+}
+
 function bindTaskEl(el, t) {
     el.querySelectorAll('[data-act]').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -722,13 +760,52 @@ function bindTaskEl(el, t) {
     });
     const selCheck = el.querySelector('.sel-check');
     if (selCheck) selCheck.addEventListener('change', () => toggleSelect(t.id));
+    bindProgressBar(el, t);
     // 点击卡片主体在多选模式下切换选中
     el.addEventListener('click', () => { if (State.selectMode) toggleSelect(t.id); });
-    // 双击卡片打开编辑（避开操作按钮与子任务勾选区）
+    // 双击卡片打开编辑（避开操作按钮、子任务勾选区与进度条）
     el.addEventListener('dblclick', (e) => {
-        if (e.target.closest('.task-actions') || e.target.closest('.subtask-list') || e.target.closest('.task-check')) return;
+        if (e.target.closest('.task-actions') || e.target.closest('.subtask-list') || e.target.closest('.task-check') || e.target.closest('.task-progress')) return;
         openTaskModal(t);
     });
+}
+
+// 进度条交互：按下即预览，拖动跟手，松手落库（不触发整表重渲染，避免拖拽中断）
+function bindProgressBar(el, t) {
+    const bar = el.querySelector('[data-progress-bar]');
+    if (!bar) return;
+    const track = bar.querySelector('.tp-track');
+    const fill = bar.querySelector('.tp-fill');
+    const num = bar.querySelector('.tp-num');
+    if (!track) return;
+
+    const preview = (pct) => {
+        if (fill) fill.style.width = pct + '%';
+        if (num) num.textContent = pct + '%';
+        bar.title = `完成度 ${pct}%，点击进度条可直接调整`;
+    };
+
+    let dragging = false;
+    const onMove = (ev) => { if (dragging) preview(progressFromPointer(ev, track)); };
+    const onUp = (ev) => {
+        if (!dragging) return;
+        dragging = false;
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        const pct = progressFromPointer(ev, track);
+        preview(pct);
+        setTaskProgress(t.id, pct, { silent: true });
+    };
+
+    bar.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault(); e.stopPropagation();
+        dragging = true;
+        preview(progressFromPointer(e, track));
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    });
+    bar.addEventListener('click', (e) => e.stopPropagation());
 }
 
 // ---------------------------------------------------------------------------
@@ -763,15 +840,29 @@ function setStatus(id, status) {
     if (status === 'in-progress' && !t.startedAt) t.startedAt = now;
     if (status === 'completed') {
         t.completedAt = now;
+        t.progress = 100;
         if (!t.startedAt) t.startedAt = now;
         spawnRecurring(t);
     }
-    if (status === 'pending') { t.completedAt = null; }
+    if (status === 'pending') { t.completedAt = null; t.progress = 0; }
     t.status = status;
     t.updatedAt = now;
     saveTodos();
     renderAll();
     showNotification(`已标记为「${STATUS[status]}」`, 'success');
+}
+
+// 调整在办任务完成度；opts.silent 时不重渲染（进度条自身的 DOM 已同步）
+function setTaskProgress(id, pct, opts) {
+    const t = findTask(id);
+    if (!t || t.status !== 'in-progress') return;
+    const next = clampProgress(pct);
+    if (next === storedProgress(t)) return;
+    t.progress = next;
+    t.updatedAt = new Date().toISOString();
+    saveTodos();
+    if (!opts || !opts.silent) renderCurrentView();
+    if (State.settings.showDashboard) renderDashboard();
 }
 
 function setPriority(id, pr) {
@@ -788,6 +879,7 @@ function copyTask(t) {
         id: uid(),
         content: t.content + '（副本）',
         status: 'pending',
+        progress: 0,
         pinned: false,
         subtasks: (t.subtasks || []).map(s => ({ ...s, id: uid(), done: false })),
         createdAt: new Date().toISOString(),
@@ -855,6 +947,7 @@ function openTaskModal(task) {
     $('f-repeat').value = isEdit ? (task.repeat ? task.repeat.type : 'none') : 'none';
     $('f-repeat-interval').value = isEdit && task.repeat ? (task.repeat.interval || 3) : 3;
     $('f-repeat-interval').classList.toggle('hidden', $('f-repeat').value !== 'custom');
+    setModalProgress(isEdit ? storedProgress(task) : 0);
 
     // 清单下拉
     const listSel = $('f-list');
@@ -866,6 +959,15 @@ function openTaskModal(task) {
 
     openModal('task-modal');
     setTimeout(() => $('f-content').focus(), 100);
+}
+
+// 弹窗里的完成度控件：range / 数字 / 预设按钮三处保持同步
+function setModalProgress(v) {
+    const p = clampProgress(v);
+    const range = $('f-progress'), num = $('f-progress-num'), label = $('f-progress-val');
+    if (range) range.value = p;
+    if (num) num.value = p;
+    if (label) label.textContent = p + '%';
 }
 
 function renderSubtaskEditor() {
@@ -888,6 +990,7 @@ function saveTaskFromModal() {
     const tags = $('f-tags').value.split(',').map(s => s.trim()).filter(Boolean);
     const repeatType = $('f-repeat').value;
     const subtasks = State.editingSubtasks.filter(s => s.text.trim()).map(s => ({ id: s.id || uid(), text: s.text.trim(), done: !!s.done }));
+    const existing = id ? findTask(id) : null;
 
     const payload = {
         content,
@@ -899,6 +1002,7 @@ function saveTaskFromModal() {
         dueTime: $('f-time').value,
         tags,
         repeat: { type: repeatType, interval: parseInt($('f-repeat-interval').value) || 1 },
+        progress: (existing && existing.status === 'completed') ? 100 : clampProgress($('f-progress-num').value),
         subtasks
     };
 
@@ -982,6 +1086,7 @@ function renderKanban(visible) {
                             ${t.date ? `<span class="badge date ${isOverdue(t) ? 'overdue' : ''}">${t.date}</span>` : ''}
                             ${(t.tags || []).slice(0, 2).map(tg => `<span class="badge tag">#${escapeHtml(tg)}</span>`).join('')}
                         </div>
+                        ${progressBarHtml(t, true)}
                     </div>`).join('')}
             </div>
         </div>`;
@@ -995,7 +1100,12 @@ function bindKanbanDnD() {
     $('kanban').querySelectorAll('.kanban-card').forEach(card => {
         card.addEventListener('dragstart', () => { dragId = card.dataset.id; card.classList.add('dragging'); });
         card.addEventListener('dragend', () => card.classList.remove('dragging'));
-        card.addEventListener('dblclick', () => { const t = findTask(card.dataset.id); if (t) openTaskModal(t); });
+        card.addEventListener('dblclick', (e) => {
+            if (e.target.closest('.task-progress')) return;
+            const t = findTask(card.dataset.id); if (t) openTaskModal(t);
+        });
+        const t = findTask(card.dataset.id);
+        if (t) bindProgressBar(card, t);
     });
     $('kanban').querySelectorAll('.kanban-col').forEach(col => {
         col.addEventListener('dragover', (e) => { e.preventDefault(); col.classList.add('drag-over'); });
@@ -1222,7 +1332,9 @@ function renderDashboard() {
     const total = active.length;
     const completed = active.filter(t => t.status === 'completed').length;
     const pending = active.filter(t => t.status === 'pending').length;
-    const inProgress = active.filter(t => t.status === 'in-progress').length;
+    const inProgressTasks = active.filter(t => t.status === 'in-progress');
+    const inProgress = inProgressTasks.length;
+    const avgProgress = inProgress ? Math.round(inProgressTasks.reduce((s, t) => s + taskProgress(t), 0) / inProgress) : 0;
     const overdue = active.filter(t => isOverdue(t)).length;
     const rate = total ? Math.round(completed / total * 100) : 0;
 
@@ -1238,7 +1350,7 @@ function renderDashboard() {
         ${metric('list', '总任务', total, 'primary')}
         ${metric('circle-check', '完成率', rate + '%', 'success', `${completed} / ${total}`)}
         ${metric('clock', '待办', pending, 'warning')}
-        ${metric('activity', '在办', inProgress, 'info')}
+        ${metric('activity', '在办', inProgress, 'info', inProgress ? `平均完成度 ${avgProgress}%` : '')}
         ${metric('warning', '逾期', overdue, 'danger')}
         ${metric('sun', '今日待办', todayTodo, 'primary', `今日完成 ${todayDone}`)}
         ${metric('calendar-week', '本周完成', weekDone, 'success')}
@@ -1788,6 +1900,7 @@ function createTaskFromQuick(p) {
         id: uid(), content: p.content, note: '', priority: p.priority || 'medium',
         listId: p.listId || 'default', date: p.date || localISO(new Date()), dueTime: p.dueTime || '',
         tags: p.tags || [], subtasks: [], repeat: { type: 'none', interval: 1 },
+        progress: 0,
         status: 'pending', pinned: false, archived: false, order: maxOrder + 1,
         createdAt: now, startedAt: null, completedAt: null, updatedAt: now
     });
@@ -1859,7 +1972,7 @@ function renderCommandList() {
             inner = `<span class="cmdk-ic">${I(it.icon || 'chevron-right')}</span><span class="cmdk-main"><span class="cmdk-label">${escapeHtml(it.label)}</span>${it.hint ? `<span class="cmdk-sub">${escapeHtml(it.hint)}</span>` : ''}</span>`;
         } else {
             const t = it.task;
-            const meta = [t.date, t.dueTime, STATUS[t.status]].filter(Boolean).join(' · ');
+            const meta = [t.date, t.dueTime, STATUS[t.status] + (t.status === 'in-progress' ? ` ${taskProgress(t)}%` : '')].filter(Boolean).join(' · ');
             inner = `<span class="cmdk-ic">${I('circle')}</span><span class="cmdk-main"><span class="cmdk-label">${escapeHtml(t.content)}</span><span class="cmdk-sub">${escapeHtml(meta)}</span></span>`;
         }
         return `<div class="cmdk-item ${i === State.cmdk.index ? 'active' : ''}" data-index="${i}">${inner}</div>`;
@@ -1907,6 +2020,19 @@ function bindEvents() {
     $('f-content').addEventListener('blur', () => { smartParse(); setTimeout(() => $('content-suggest').classList.remove('show'), 150); });
     $('f-repeat').addEventListener('change', (e) => $('f-repeat-interval').classList.toggle('hidden', e.target.value !== 'custom'));
     $('add-subtask').addEventListener('click', () => { State.editingSubtasks.push({ id: uid(), text: '', done: false }); renderSubtaskEditor(); });
+
+    // 完成度：range 与数字框联动，预设按钮直接落值
+    $('f-progress').addEventListener('input', (e) => setModalProgress(e.target.value));
+    $('f-progress-num').addEventListener('input', (e) => {
+        if (e.target.value === '') return;
+        const p = clampProgress(e.target.value);
+        $('f-progress').value = p;
+        $('f-progress-val').textContent = p + '%';
+    });
+    $('f-progress-num').addEventListener('blur', (e) => setModalProgress(e.target.value));
+    document.querySelectorAll('[data-progress-preset]').forEach(btn => {
+        btn.addEventListener('click', () => setModalProgress(btn.dataset.progressPreset));
+    });
 
     // 搜索（防抖）
     $('search-input').addEventListener('input', debounce((e) => { State.filters.search = e.target.value.trim(); renderCurrentView(); }, 250));
@@ -1963,7 +2089,18 @@ function bindEvents() {
     $('select-mode-btn').addEventListener('click', () => toggleSelectMode());
     $('bulk-cancel').addEventListener('click', () => toggleSelectMode(false));
     $('bulk-select-all').addEventListener('click', () => { getVisibleTodos().forEach(t => State.selected.add(t.id)); updateBulkBar(); renderCurrentView(); });
-    $('bulk-status').addEventListener('change', (e) => { const v = e.target.value; if (!v) return; bulkApply(t => { t.status = v; t.updatedAt = new Date().toISOString(); if (v === 'completed') { t.completedAt = new Date().toISOString(); if (!t.startedAt) t.startedAt = t.completedAt; spawnRecurring(t); } }, '批量修改状态完成'); e.target.value = ''; });
+    $('bulk-status').addEventListener('change', (e) => {
+        const v = e.target.value; if (!v) return;
+        bulkApply(t => {
+            t.status = v; t.updatedAt = new Date().toISOString();
+            if (v === 'completed') {
+                t.completedAt = new Date().toISOString(); t.progress = 100;
+                if (!t.startedAt) t.startedAt = t.completedAt;
+                spawnRecurring(t);
+            } else if (v === 'pending') { t.completedAt = null; t.progress = 0; }
+        }, '批量修改状态完成');
+        e.target.value = '';
+    });
     $('bulk-priority').addEventListener('change', (e) => { const v = e.target.value; if (!v) return; bulkApply(t => { t.priority = v; t.updatedAt = new Date().toISOString(); }, '批量修改优先级完成'); e.target.value = ''; });
     $('bulk-archive').addEventListener('click', () => bulkApply(t => t.archived = true, '批量归档完成'));
     $('bulk-delete').addEventListener('click', () => {

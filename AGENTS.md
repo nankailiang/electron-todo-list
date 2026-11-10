@@ -67,7 +67,7 @@ reports.json      # 日报（可选加密）
 crypto.meta.json  # { salt, verifier }（启用加密才有）
 backups/          # 每日备份 todo-backup-YYYY-MM-DD.json，保留 7 天（加密开启时备份也是密文）
 ```
-**任务对象关键字段**：`id, content, note, priority(high|medium|low), status(pending|in-progress|completed), listId, date(截止日 YYYY-MM-DD), startDate(开始日，空=立即), dueTime(HH:MM，可空), tags[], subtasks[{id,text,done}], repeat{type:none|daily|weekly|monthly|custom, interval}, pinned, archived, order, createdAt, startedAt, completedAt, updatedAt, recurPrevId(内部：重复任务去重)`
+**任务对象关键字段**：`id, content, note, priority(high|medium|low), status(pending|in-progress|completed), progress(0-100 完成度，仅在办展示), listId, date(截止日 YYYY-MM-DD), startDate(开始日，空=立即), dueTime(HH:MM，可空), tags[], subtasks[{id,text,done}], repeat{type:none|daily|weekly|monthly|custom, interval}, pinned, archived, order, createdAt, startedAt, completedAt, updatedAt, recurPrevId(内部：重复任务去重)`
 
 **加密**：`scrypt(pass, salt, N=2^14,r=8,p=1) 派生 32B key` + `AES-256-GCM`，密文格式 `ENC1:<ivhex>:<taghex>:<datahex>`。启用后 `todoList.json`/`reports.json`/备份均加密。
 
@@ -84,13 +84,14 @@ backups/          # 每日备份 todo-backup-YYYY-MM-DD.json，保留 7 天（�
 - **自动排程** `autoSchedule()`：把本周“有日期无时间、未完成、已到开始日”的任务按优先级填进 9:00–19:00 空闲整点。
 - **双日期**：`startDate`（开始日，语义=延后出现）+ `date`（截止）；筛选面板有“隐藏未开始”。
 - **重复任务**：`setStatus('completed')` 时 `spawnRecurring()` 生成下一周期；用 `recurPrevId` 去重（完成→重开→再完成不会重复生成）。
+- **完成度**：`progress`（0~100）。展示层统一走 `taskProgress(t)`（结办=100、非在办=0、在办取 `clampProgress(progress)`），卡片/看板用 `progressBarHtml()` 渲染，`bindProgressBar()` 支持点击+拖动轨道改值（拖动期间只改 DOM，松手 `setTaskProgress(id,pct,{silent:true})` 落库）；编辑框 `#f-progress`(range)/`#f-progress-num`/预设按钮由 `setModalProgress()` 三向同步。`setStatus` 结办置 100、改回待办置 0，复制/重复生成重置 0。
 - 关键工具：`todayISO()=localISO(new Date())`（**本地日期，勿用 toISOString 取日期**）；`tsDay(ts)` 把时间戳按本地日归日（统计分组用）。
 - 快捷键汇总：`Ctrl+K` 面板 / `Ctrl+Shift+Space` 录入 / `Ctrl+N` 新建 / `Ctrl+F` 搜索 / `Esc` 关弹窗 / 任务框内 `Ctrl+Enter` 保存。
 
 ---
 
 ## 7. 已实现功能清单
-多清单(颜色) · 列表/看板(拖拽改状态)/日历(月+周时间块拖拽) · 仪表盘图表(优先/趋势/柱/标签/效率) · 日报(生成/编辑/导出) · 标签 · 子任务 · 重复(日/周/月/自定义) · 到期提醒+每日提醒(系统通知) · 搜索(含拼音首字母)+高级筛选+保存筛选 · 批量操作 · 导入导出(json/csv/txt/md) · 数据加密 · 备份/恢复(每日+手动) · 单实例锁 · 命令面板+快捷录入(全局快捷键) · 一键自动排程 · 开始/截止双日期 · 深浅色主题 · 紧凑模式 · 列表手动拖拽排序(仅 sort=manual 且非多选时) · 双击任务卡片编辑。
+多清单(颜色) · 列表/看板(拖拽改状态)/日历(月+周时间块拖拽) · 仪表盘图表(优先/趋势/柱/标签/效率) · 日报(生成/编辑/导出) · 标签 · 子任务 · 在办任务完成度百分比(进度条/滑块/预设) · 重复(日/周/月/自定义) · 到期提醒+每日提醒(系统通知) · 搜索(含拼音首字母)+高级筛选+保存筛选 · 批量操作 · 导入导出(json/csv/txt/md) · 数据加密 · 备份/恢复(每日+手动) · 单实例锁 · 命令面板+快捷录入(全局快捷键) · 一键自动排程 · 开始/截止双日期 · 深浅色主题 · 紧凑模式 · 列表手动拖拽排序(仅 sort=manual 且非多选时) · 双击任务卡片编辑。
 
 ---
 

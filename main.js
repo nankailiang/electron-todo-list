@@ -311,16 +311,19 @@ function buildReportSummary(todos, dateStr) {
     // 逾期未完成：截止日期早于当日且未结办
     const overdue = scope.filter(t => !t.archived && t.status !== 'completed' && t.date && t.date < dateStr);
 
-    const pick = (t) => ({ id: t.id, content: t.content, priority: t.priority, listId: t.listId, status: t.status, date: t.date, dueTime: t.dueTime || '' });
-    const lines = (arr, label) => {
+    const pick = (t) => ({ id: t.id, content: t.content, priority: t.priority, listId: t.listId, status: t.status, date: t.date, dueTime: t.dueTime || '', progress: clampProgress(t.progress) });
+    const lines = (arr, label, withProgress) => {
         if (!arr.length) return `## ${label}\n（无）\n`;
-        return `## ${label}\n` + arr.map(t => `- ${t.content}${t.dueTime ? ' ' + t.dueTime : ''}`).join('\n') + '\n';
+        return `## ${label}\n` + arr.map(t => {
+            const pct = withProgress && t.status === 'in-progress' ? `（完成度 ${clampProgress(t.progress)}%）` : '';
+            return `- ${t.content}${t.dueTime ? ' ' + t.dueTime : ''}${pct}`;
+        }).join('\n') + '\n';
     };
 
     const defaultContent =
         `# 工作日报（${dateStr}）\n\n` +
         lines(completed, '今日完成') +
-        lines(inProgress, '进行中') +
+        lines(inProgress, '进行中', true) +
         lines(pending, '待处理') +
         lines(overdue, '逾期未完成') +
         '## 明日计划\n- \n';
@@ -560,14 +563,15 @@ ipcMain.handle('export-todos', async (e, { format, todos }) => {
 });
 
 function toCSV(todos) {
-    const headers = ['id', 'listId', 'startDate', 'date', 'dueTime', 'priority', 'content', 'note', 'status', 'tags', 'createdAt', 'startedAt', 'completedAt'];
+    const headers = ['id', 'listId', 'startDate', 'date', 'dueTime', 'priority', 'content', 'note', 'status', 'progress', 'tags', 'createdAt', 'startedAt', 'completedAt'];
     let csv = headers.join(',') + '\n';
     todos.forEach(t => {
         const row = [
             t.id, t.listId || '', t.startDate || '', t.date || '', t.dueTime || '', t.priority || '',
             `"${(t.content || '').replace(/"/g, '""')}"`,
             `"${(t.note || '').replace(/"/g, '""')}"`,
-            t.status || '', `"${(t.tags || []).join('|')}"`,
+            t.status || '', t.status === 'completed' ? 100 : clampProgress(t.progress),
+            `"${(t.tags || []).join('|')}"`,
             t.createdAt || '', t.startedAt || '', t.completedAt || ''
         ];
         csv += row.join(',') + '\n';
@@ -578,7 +582,9 @@ function toCSV(todos) {
 function toTXT(todos) {
     let txt = `待办事项列表\n导出时间: ${new Date().toLocaleString()}\n总数量: ${todos.length}\n${'-'.repeat(50)}\n\n`;
     todos.forEach((t, i) => {
-        txt += `${i + 1}. [${STATUS_MAP[t.status] || t.status}] ${t.content}\n`;
+        txt += `${i + 1}. [${STATUS_MAP[t.status] || t.status}] ${t.content}`;
+        if (t.status === 'in-progress') txt += `（完成度 ${clampProgress(t.progress)}%）`;
+        txt += '\n';
         txt += `   日期: ${t.date || ''}${t.dueTime ? ' ' + t.dueTime : ''}\n`;
         txt += `   优先级: ${PRIORITY_MAP[t.priority] || t.priority}\n`;
         if (t.tags && t.tags.length) txt += `   标签: ${t.tags.join(', ')}\n`;
@@ -601,6 +607,7 @@ function toMarkdown(todos) {
             const pr = PRIORITY_MAP[t.priority] || '';
             md += `- ${box} **${t.content}**`;
             const metas = [];
+            if (status === 'in-progress') metas.push(`完成度 ${clampProgress(t.progress)}%`);
             if (t.date) metas.push(`📅 ${t.date}${t.dueTime ? ' ' + t.dueTime : ''}`);
             if (pr) metas.push(`🚩 ${pr}`);
             if (t.tags && t.tags.length) metas.push(t.tags.map(x => '`#' + x + '`').join(' '));
@@ -648,11 +655,19 @@ ipcMain.handle('parse-import', async (e, { filePath, format }) => {
     }
 });
 
+// 完成度：0~100 整数，容忍 "30%" 这类写法与脏数据
+function clampProgress(v) {
+    if (v === null || v === undefined || v === '') return 0;
+    const n = Math.round(parseFloat(String(v).replace('%', '').trim()));
+    return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0;
+}
+
 function normalizeTodo(t) {
     if (!t || !t.content) return null;
     let tags = t.tags;
     if (typeof tags === 'string') tags = tags.split(/[|,]/).map(s => s.trim()).filter(Boolean);
     if (!Array.isArray(tags)) tags = [];
+    const status = ['pending', 'in-progress', 'completed'].includes(t.status) ? t.status : 'pending';
     return {
         id: t.id ? String(t.id) : (Date.now().toString() + Math.random().toString(36).slice(2, 8)),
         listId: t.listId || 'default',
@@ -662,7 +677,8 @@ function normalizeTodo(t) {
         priority: ['high', 'medium', 'low'].includes(t.priority) ? t.priority : 'medium',
         content: String(t.content).trim(),
         note: t.note || '',
-        status: ['pending', 'in-progress', 'completed'].includes(t.status) ? t.status : 'pending',
+        status,
+        progress: status === 'completed' ? 100 : clampProgress(t.progress),
         tags,
         subtasks: Array.isArray(t.subtasks) ? t.subtasks : [],
         pinned: !!t.pinned,

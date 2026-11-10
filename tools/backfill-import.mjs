@@ -270,6 +270,16 @@ function normTime(v) {
     return `${pad(h)}:${pad(mi)}`;
 }
 
+/** 完成度：接受 30 / "30%" / " 30 "，夹到 0~100；空值按 0 */
+function normProgress(v) {
+    if (v === undefined || v === null) return 0;
+    const s = String(v).trim().replace(/%/g, '');
+    if (!s) return 0;
+    const n = Number(s);
+    if (!isFinite(n)) return 0;
+    return Math.max(0, Math.min(100, Math.round(n)));
+}
+
 const PRIORITY_ALIAS = {
     high: 'high', medium: 'medium', low: 'low',
     '高': 'high', '中': 'medium', '低': 'low', '紧急': 'high', '普通': 'medium',
@@ -319,6 +329,7 @@ function toTask({ flat, raw }, listIds, orderStart) {
         note: flat.note || '',
         priority,
         status,
+        progress: status === 'completed' ? 100 : normProgress(flat.progress),
         listId,
         date: baseDate || '',
         startDate: normDate(flat.startdate),
