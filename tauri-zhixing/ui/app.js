@@ -428,41 +428,11 @@ function sortTodos(list) {
 // ---------------------------------------------------------------------------
 function renderAll() {
     renderSidebar();
-    renderWeekStrip();
     renderTagFilter();
     renderSavedFilters();
     renderDashboard();
     renderCurrentView();
     updateHeader();
-}
-
-function renderWeekStrip() {
-    const container = $('week-strip');
-    if (!container) return;
-    const now = new Date();
-    const day = now.getDay(); // 0=Sun
-    const mondayOffset = day === 0 ? -6 : 1 - day;
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + mondayOffset);
-    const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
-    const todayStr = todayISO();
-
-    let html = '';
-    for (let i = 0; i < 7; i++) {
-        const d = new Date(monday);
-        d.setDate(monday.getDate() + i);
-        const dateStr = localISO(d);
-        const isToday = dateStr === todayStr;
-        html += `<button class="week-day${isToday ? ' today' : ''}" data-date="${dateStr}">
-            <span class="wd-name">${weekDays[d.getDay()]}</span>
-            <span class="wd-num">${d.getDate()}</span>
-        </button>`;
-    }
-    container.innerHTML = html;
-
-    // 高亮今天
-    const todayEl = container.querySelector('.week-day.today');
-    if (todayEl) todayEl.classList.add('active');
 }
 
 function renderCurrentView() {
@@ -1229,10 +1199,18 @@ function renderWeekTimeline() {
     const head = `<div class="wt-head"><div class="wt-gutter-spacer"></div>${days.map((d, i) =>
         `<div class="wt-daylabel ${d === today ? 'today' : ''}"><span>周${WD[i]}</span><b>${dayNum(d)}</b></div>`).join('')}</div>`;
 
+    const ALL_LIMIT = 3;
+    if (!cal.allExpanded) cal.allExpanded = {};
     const allrow = `<div class="wt-allrow"><div class="wt-alllabel">全天</div>${days.map(d => {
         const al = (byDate[d] || []).filter(t => !t.dueTime);
-        return `<div class="wt-allday" data-date="${d}">${al.map(t =>
-            `<div class="wt-chip pr-${t.priority} ${t.status === 'completed' ? 'completed' : ''}" data-task-id="${t.id}" title="${escapeHtml(t.content)}">${escapeHtml(t.content)}</div>`).join('')}</div>`;
+        const exp = !!cal.allExpanded[d];
+        const shown = exp ? al : al.slice(0, ALL_LIMIT);
+        const rest = al.length - shown.length;
+        let more = '';
+        if (rest > 0) more = `<button class="wt-more" data-more="${d}" title="展开全部 ${al.length} 条">+${rest} 条</button>`;
+        else if (exp && al.length > ALL_LIMIT) more = `<button class="wt-more" data-more="${d}">收起</button>`;
+        return `<div class="wt-allday" data-date="${d}">${shown.map(t =>
+            `<div class="wt-chip pr-${t.priority} ${t.status === 'completed' ? 'completed' : ''}" data-task-id="${t.id}" title="${escapeHtml(t.content)}">${escapeHtml(t.content)}</div>`).join('')}${more}</div>`;
     }).join('')}</div>`;
 
     const cols = days.map(d => {
@@ -1252,6 +1230,14 @@ function renderWeekTimeline() {
     }
 
     $('week-timeline').innerHTML = `${head}${allrow}<div class="wt-scroll"><div class="wt-body" style="height:${slots * HH}px"><div class="wt-gutter">${gutter}</div><div class="wt-cols">${cols}${nowLine}</div></div></div>`;
+    $('week-timeline').querySelectorAll('.wt-more').forEach(b => {
+        b.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const d = b.dataset.more;
+            cal.allExpanded[d] = !cal.allExpanded[d];
+            renderWeekTimeline();
+        });
+    });
     bindWeekDnD();
 }
 
@@ -2218,16 +2204,6 @@ function bindEvents() {
     // 移动端侧栏
     $('menu-toggle').addEventListener('click', () => { $('sidebar').classList.add('open'); $('sidebar-backdrop').classList.add('show'); });
     $('sidebar-backdrop').addEventListener('click', closeSidebarMobile);
-
-    // 周历条点击
-    $('week-strip').addEventListener('click', (e) => {
-        const dayEl = e.target.closest('.week-day');
-        if (!dayEl) return;
-        document.querySelectorAll('.week-day').forEach(d => d.classList.remove('active'));
-        dayEl.classList.add('active');
-        const date = dayEl.dataset.date;
-        if (date) { State.filters.start = date; State.filters.end = date; renderCurrentView(); }
-    });
 
     // 底部浮动导航
     document.querySelectorAll('.bottom-nav-btn').forEach(btn => btn.addEventListener('click', () => {

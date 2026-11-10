@@ -186,24 +186,6 @@ button, input, select, textarea { font-family: inherit; }
 /* ---- 主区 ---- */
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
-/* ---- 周历条（新增，参考图风格） ---- */
-.week-strip {
-    display: flex; align-items: center; gap: 6px; padding: 14px 24px 0;
-    background: transparent;
-}
-.week-day {
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
-    padding: 8px 14px; border-radius: var(--radius-sm); cursor: pointer;
-    transition: all 0.2s ease; min-width: 48px; background: transparent; border: none;
-    font-family: inherit;
-}
-.week-day .wd-name { font-size: 0.72rem; color: var(--text-3); font-weight: 500; }
-.week-day .wd-num { font-size: 0.95rem; color: var(--text-2); font-weight: 600; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.2s ease; }
-.week-day:hover { background: var(--surface-3); }
-.week-day.today .wd-num { background: var(--primary); color: #fff; box-shadow: 0 2px 8px rgba(61, 190, 156, 0.35); }
-.week-day.active .wd-num { background: var(--text); color: #fff; }
-.week-day.today.active .wd-num { background: var(--primary); }
-
 /* ---- 顶栏 ---- */
 .topbar {
     display: flex; align-items: center; gap: 14px; padding: 10px 24px 14px;
@@ -617,8 +599,6 @@ textarea.report-textarea { min-height: 46vh; font-family: var(--font); line-heig
     .sidebar-backdrop { display: block; position: fixed; inset: 0; background: rgba(45, 45, 58, 0.2); z-index: 1090; opacity: 0; pointer-events: none; backdrop-filter: blur(4px); transition: opacity 0.25s; }
     .sidebar-backdrop.show { opacity: 1; pointer-events: auto; }
     .menu-toggle { display: inline-flex !important; }
-    .week-strip { padding: 10px 14px 0; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .week-day { padding: 6px 10px; min-width: 42px; }
     .charts-row { grid-template-columns: 1fr; }
     .charts-grid { grid-template-columns: 1fr; }
     .dash-top { flex-direction: column; }
@@ -687,12 +667,14 @@ textarea.report-textarea { min-height: 46vh; font-family: var(--font); line-heig
 .wt-daylabel.today b { background: var(--primary); color: #fff; box-shadow: 0 2px 8px rgba(61, 190, 156, 0.35); }
 .wt-allrow { display: grid; grid-template-columns: 56px repeat(7, 1fr); border-bottom: 1px solid var(--border); margin-bottom: 6px; min-height: 30px; }
 .wt-alllabel { font-size: 0.68rem; color: var(--text-3); display: flex; align-items: flex-start; padding-top: 4px; justify-content: flex-end; padding-right: 8px; }
-.wt-allday { display: flex; flex-direction: column; gap: 3px; padding: 2px 3px; min-height: 26px; border-left: 1px solid var(--border); }
-.wt-chip { font-size: 0.7rem; padding: 2px 7px; border-radius: 6px; background: var(--primary-soft); color: var(--text-2); cursor: grab; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid var(--medium); touch-action: none; }
+.wt-allday { display: flex; flex-direction: column; gap: 3px; padding: 2px 3px; min-height: 26px; min-width: 0; max-height: 168px; overflow-y: auto; overflow-x: hidden; border-left: 1px solid var(--border); }
+.wt-chip { font-size: 0.7rem; line-height: 18px; padding: 2px 7px; border-radius: 6px; background: var(--primary-soft); color: var(--text-2); cursor: grab; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid var(--medium); touch-action: none; flex-shrink: 0; max-width: 100%; box-sizing: border-box; }
+.wt-more { align-self: flex-start; font-size: 0.68rem; color: var(--primary); background: none; border: none; padding: 0 2px; cursor: pointer; font-family: inherit; line-height: 16px; flex-shrink: 0; }
+.wt-more:hover { text-decoration: underline; }
 .wt-chip.pr-high { border-left-color: var(--high); }
 .wt-chip.pr-low { border-left-color: var(--low); }
 .wt-chip.completed { text-decoration: line-through; opacity: 0.55; }
-.wt-scroll { max-height: 60vh; overflow-y: auto; }
+.wt-scroll { max-height: 60vh; overflow-y: auto; padding: 9px 0; }
 .wt-body { position: relative; display: flex; }
 .wt-gutter { width: 56px; flex-shrink: 0; position: relative; }
 .wt-hour { position: absolute; right: 8px; transform: translateY(-50%); font-size: 0.66rem; color: var(--text-3); }

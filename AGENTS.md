@@ -78,8 +78,8 @@ backups/          # 每日备份 todo-backup-YYYY-MM-DD.json，保留 7 天（�
 ## 6. 前端结构（app.js）
 - 全局 `State`：`todos, lists, savedFilters, reports, editingReport, settings, filters, sort, selectMode, selected, editingSubtasks, calendar{mode,weekStart...}, cmdk, importBuffer, ...`
 - **持久化**：`persist.todos/settings/...`（防抖）+ `saveTodos()`；`migrateData()` 给旧数据补字段。
-- **视图**：`view-list` / `view-kanban` / `view-calendar`（三选一，用 `.hidden` 切）+ 仪表盘 `dashboard-wrap`（与视图互斥）。渲染入口 `renderAll()` → `renderSidebar/renderWeekStrip/renderDashboard/renderCurrentView`。
-- **日历**：`renderCalendar()` 分月视图 `renderMonthGrid()` 与**周时间块** `renderWeekTimeline()`（按 `dueTime` 绝对定位，6:00–24:00，`--hourh:44px`）。周视图用 pointer 拖拽改期（`wtOnMove/wtOnUp/wtCompute`，文档级监听只绑一次）；月视图用 HTML5 DnD 改日期。
+- **视图**：`view-list` / `view-kanban` / `view-calendar`（三选一，用 `.hidden` 切）+ 仪表盘 `dashboard-wrap`（与视图互斥）。渲染入口 `renderAll()` → `renderSidebar/renderTagFilter/renderSavedFilters/renderDashboard/renderCurrentView`。顶部那排「周日期条」已移除（点它会写 `filters.start/end`，把列表筛空，容易误解）。
+- **日历**：`renderCalendar()` 分月视图 `renderMonthGrid()` 与**周时间块** `renderWeekTimeline()`（按 `dueTime` 绝对定位，6:00–24:00，`--hourh:44px`）。周视图用 pointer 拖拽改期（`wtOnMove/wtOnUp/wtCompute`，文档级监听只绑一次）；月视图用 HTML5 DnD 改日期。**顶部「全天」区每列默认只显示 3 条**，其余折叠成 `+N 条`/`收起`（状态在 `State.calendar.allExpanded`），避免任务多时把时间轴挤下去；`.wt-allday` 另有 `max-height:168px` 兜底防止溢出裁字。
 - **命令面板/快捷录入**：`openCommandBar(mode)` / `renderCommandBar` / `execCmdkItem`；`parseQuickTask(text)` 中文自然语言（今天/明天/后天/周X/下周X/X月X日/时间/紧急→高/#标签）。触发：`Ctrl/Cmd+K`（命令面板）、`Ctrl/Cmd+Shift+Space`（快捷录入，且由 main.js `globalShortcut` 全局唤起）。
 - **自动排程** `autoSchedule()`：把本周“有日期无时间、未完成、已到开始日”的任务按优先级填进 9:00–19:00 空闲整点。
 - **双日期**：`startDate`（开始日，语义=延后出现）+ `date`（截止）；筛选面板有“隐藏未开始”。
