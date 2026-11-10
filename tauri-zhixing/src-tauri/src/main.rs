@@ -194,26 +194,51 @@ fn progress_of(t: &Value) -> i64 {
     raw.unwrap_or(0.0).round().clamp(0.0, 100.0) as i64
 }
 
-fn build_report_summary(todos: &Value, date: &str) -> Value {
+fn build_report_summary(todos: &Value, date: &str, author: &str, style: &str) -> Value {
     let scope = arr(todos);
+    let archived = |t: &Value| t.get("archived").and_then(|x| x.as_bool()).unwrap_or(false);
+    let day_of = |s: String| -> String { s.get(0..10).unwrap_or("").to_string() };
+    let started_on = |t: &Value| -> String {
+        let sd = s_or(t, "startDate", "");
+        if !sd.is_empty() { return day_of(sd); }
+        let sa = s_or(t, "startedAt", "");
+        if !sa.is_empty() { return day_of(sa); }
+        day_of(s_or(t, "createdAt", ""))
+    };
+
+    // 当天到期 / 当天开始
     let due: Vec<&Value> = scope
         .iter()
-        .filter(|t| s_or(t, "date", "") == date && !t.get("archived").and_then(|x| x.as_bool()).unwrap_or(false))
+        .filter(|t| !archived(t) && (s_or(t, "date", "") == date || s_or(t, "startDate", "") == date))
         .collect();
-    let completed: Vec<&Value> = due
+    let completed: Vec<&Value> = scope
         .iter()
         .filter(|t| {
-            s_or(t, "status", "") == "completed"
-                || s_or(t, "completedAt", "").get(0..10).map(|d| d == date).unwrap_or(false)
+            if archived(t) {
+                return false;
+            }
+            let st = s_or(t, "status", "");
+            let done_day = day_of(s_or(t, "completedAt", ""));
+            done_day == date || (st == "completed" && (s_or(t, "date", "") == date || s_or(t, "startDate", "") == date))
         })
-        .cloned()
         .collect();
-    let in_progress: Vec<&Value> = due.iter().filter(|t| s_or(t, "status", "") == "in-progress").cloned().collect();
+    // 在办：截止日可以在未来，只要当天已经开始就算「今天在干这件事」
+    let in_progress: Vec<&Value> = scope
+        .iter()
+        .filter(|t| {
+            !archived(t)
+                && s_or(t, "status", "") == "in-progress"
+                && {
+                    let s = started_on(t);
+                    s.is_empty() || s.as_str() <= date
+                }
+        })
+        .collect();
     let pending: Vec<&Value> = due.iter().filter(|t| s_or(t, "status", "") == "pending").cloned().collect();
     let overdue: Vec<&Value> = scope
         .iter()
         .filter(|t| {
-            !t.get("archived").and_then(|x| x.as_bool()).unwrap_or(false)
+            !archived(t)
                 && s_or(t, "status", "") != "completed"
                 && {
                     let d = s_or(t, "date", "");
@@ -246,14 +271,49 @@ fn build_report_summary(todos: &Value, date: &str) -> Value {
         format!("## {}\n{}\n", label, body)
     };
 
-    let default_content = format!(
-        "# 工作日报（{}）\n\n{}{}{}{}## 明日计划\n- \n",
-        date,
-        lines(&completed, "今日完成", false),
-        lines(&in_progress, "进行中", true),
-        lines(&pending, "待处理", false),
-        lines(&overdue, "逾期未完成", false)
-    );
+    let default_content = if style == "markdown" {
+        format!(
+            "# 工作日报（{}）\n\n{}{}{}{}## 明日计划\n- \n",
+            date,
+            lines(&completed, "今日完成", false),
+            lines(&in_progress, "进行中", true),
+            lines(&pending, "待处理", false),
+            lines(&overdue, "逾期未完成", false)
+        )
+    } else {
+        // 纯文本日志：抬头 + 逐条「（N）内容 完成 / 60% 预计YYYYMMDD完成 / 未开始」
+        let tail = |t: &Value| -> String {
+            let status = s_or(t, "status", "");
+            if status == "completed" {
+                "完成".to_string()
+            } else if status == "in-progress" {
+                let pct = progress_of(t);
+                let d = s_or(t, "date", "");
+                if !d.is_empty() && d.as_str() > date {
+                    format!("{}% 预计{}完成", pct, d.replace('-', ""))
+                } else {
+                    format!("{}%", pct)
+                }
+            } else {
+                "未开始".to_string()
+            }
+        };
+        let plain: Vec<&Value> = completed
+            .iter()
+            .chain(in_progress.iter())
+            .chain(pending.iter())
+            .cloned()
+            .collect();
+        let mut body = if author.is_empty() {
+            String::from("工作日志\n")
+        } else {
+            format!("{} 工作日志\n", author)
+        };
+        for (i, t) in plain.iter().enumerate() {
+            body.push_str(&format!("（{}）{} {}\n", i + 1, s_or(t, "content", ""), tail(t)));
+        }
+        body
+    };
     let pick = |t: &Value| {
         json!({
             "id": t.get("id").cloned().unwrap_or(Value::Null),
@@ -268,7 +328,10 @@ fn build_report_summary(todos: &Value, date: &str) -> Value {
     };
     json!({
         "date": date,
-        "total": due.len(),
+        "title": if author.is_empty() { "工作日志".to_string() } else { format!("{} 工作日志", author) },
+        "author": author,
+        "style": style,
+        "total": completed.len() + in_progress.len() + pending.len(),
         "counts": {
             "completed": completed.len(),
             "inProgress": in_progress.len(),
@@ -636,7 +699,20 @@ fn generate_report(app: AppHandle, st: State<'_, Mutex<CryptoState>>, date: Stri
     let g = st.lock().unwrap();
     let todos = read_json(&app, "todoList.json", json!([]), g.enabled, &g);
     let list = if todos.is_array() { todos } else { json!([]) };
-    json!({ "success": true, "summary": build_report_summary(&list, &date) })
+    let settings = read_json(&app, "settings.json", Value::Null, false, &plain_state());
+    let author = settings
+        .get("reportAuthor")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    let style = settings
+        .get("reportStyle")
+        .and_then(|v| v.as_str())
+        .filter(|s| *s == "markdown")
+        .unwrap_or("plain")
+        .to_string();
+    json!({ "success": true, "summary": build_report_summary(&list, &date, &author, &style) })
 }
 
 // ---------------------------------------------------------------------------

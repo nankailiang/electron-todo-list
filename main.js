@@ -301,12 +301,48 @@ function writeReports(reports) {
     return { success: ok };
 }
 
+// 日报输出样式：plain（纯文本工作日志，默认）| markdown（按状态分组的汇总）
+function reportOptions() {
+    const s = readJson(PATHS.settings, null) || {};
+    return {
+        author: String(s.reportAuthor || '').trim(),
+        style: s.reportStyle === 'markdown' ? 'markdown' : 'plain'
+    };
+}
+
+/** 纯文本日志里的一行状态尾巴：完成 / 60% 预计20261105完成 / 未开始 */
+function plainStatusTail(t, dateStr) {
+    if (t.status === 'completed') return '完成';
+    if (t.status === 'in-progress') {
+        const pct = clampProgress(t.progress);
+        // 只有截止日晚于当天才写「预计」，当天完不成的任务不写废话
+        const eta = t.date && t.date > dateStr ? ` 预计${String(t.date).replace(/-/g, '')}完成` : '';
+        return `${pct}%${eta}`;
+    }
+    return '未开始';
+}
+
+/** 把一组任务排成「（1）内容 完成」的日志正文 */
+function plainLogBody(arr, dateStr, author) {
+    const head = author ? `${author} 工作日志\n` : '工作日志\n';
+    const body = arr.map((t, i) => `（${i + 1}）${t.content} ${plainStatusTail(t, dateStr)}`).join('\n');
+    return head + body + '\n';
+}
+
 // 根据某日任务自动汇总日报内容
 function buildReportSummary(todos, dateStr) {
     const scope = Array.isArray(todos) ? todos : [];
-    const due = scope.filter(t => t.date === dateStr && !t.archived);
-    const completed = due.filter(t => t.status === 'completed' || (t.completedAt && t.completedAt.slice(0, 10) === dateStr));
-    const inProgress = due.filter(t => t.status === 'in-progress');
+    const day = (t) => String(t.completedAt || t.updatedAt || t.createdAt || '').slice(0, 10);
+    const startedOn = (t) => String(t.startDate || t.startedAt || t.createdAt || t.date || '').slice(0, 10);
+
+    // 当天到期 / 当天完成
+    const due = scope.filter(t => !t.archived && (t.date === dateStr || t.startDate === dateStr));
+    const completed = scope.filter(t => !t.archived && (
+        (t.status === 'completed' && (t.date === dateStr || day(t) === dateStr)) ||
+        (t.completedAt && String(t.completedAt).slice(0, 10) === dateStr)
+    ));
+    // 在办：截止日可能在未来，只要当天已经开始就算「今天在干这件事」
+    const inProgress = scope.filter(t => !t.archived && t.status === 'in-progress' && (!startedOn(t) || startedOn(t) <= dateStr));
     const pending = due.filter(t => t.status === 'pending');
     // 逾期未完成：截止日期早于当日且未结办
     const overdue = scope.filter(t => !t.archived && t.status !== 'completed' && t.date && t.date < dateStr);
@@ -320,17 +356,23 @@ function buildReportSummary(todos, dateStr) {
         }).join('\n') + '\n';
     };
 
-    const defaultContent =
-        `# 工作日报（${dateStr}）\n\n` +
-        lines(completed, '今日完成') +
-        lines(inProgress, '进行中', true) +
-        lines(pending, '待处理') +
-        lines(overdue, '逾期未完成') +
-        '## 明日计划\n- \n';
+    const { author, style } = reportOptions();
+    const plainItems = [...completed, ...inProgress, ...pending];
+    const defaultContent = style === 'plain'
+        ? (plainItems.length ? plainLogBody(plainItems, dateStr, author) : (author ? `${author} 工作日志\n` : '工作日志\n'))
+        : `# 工作日报（${dateStr}）\n\n` +
+            lines(completed, '今日完成') +
+            lines(inProgress, '进行中', true) +
+            lines(pending, '待处理') +
+            lines(overdue, '逾期未完成') +
+            '## 明日计划\n- \n';
 
     return {
         date: dateStr,
-        total: due.length,
+        title: author ? `${author} 工作日志` : '工作日志',
+        author,
+        style,
+        total: plainItems.length,
         counts: { completed: completed.length, inProgress: inProgress.length, pending: pending.length, overdue: overdue.length },
         items: {
             completed: completed.map(pick),
@@ -353,20 +395,32 @@ ipcMain.handle('generate-report', (e, { date }) => {
         return { success: false, error: err.message };
     }
 });
-ipcMain.handle('export-report', async (e, { format, report }) => {
+ipcMain.handle('export-report', async (e, { format = 'txt', style, report }) => {
     try {
         if (!report || !report.content) return { success: false, error: '日报内容为空' };
+        // 纯文本日志导出按 .txt 落盘，正文本身就带「姓名 工作日志」抬头，不再套 Markdown 标题
+        const plain = (style || 'plain') !== 'markdown';
+        const ext = plain ? 'txt' : format;
         const result = await dialog.showSaveDialog({
             title: '导出日报',
-            defaultPath: path.join(app.getPath('downloads'), `日报-${report.date || 'export'}.${format}`),
-            filters: [{ name: format.toUpperCase(), extensions: [format] }, { name: 'All Files', extensions: ['*'] }]
+            defaultPath: path.join(app.getPath('downloads'), `日报-${report.date || 'export'}.${ext}`),
+            filters: [{ name: ext.toUpperCase(), extensions: [ext] }, { name: 'All Files', extensions: ['*'] }]
         });
         if (result.canceled) return { success: false, error: '导出已取消' };
-        const header = `# ${report.title || '工作日报'}\n\n> 日期：${report.date || ''}\n\n`;
-        const content = format === 'md' ? report.content : report.content
-            .replace(/^#+\s*/gm, '')
-            .replace(/\*\*(.+?)\*\*/g, '$1');
-        fs.writeFileSync(result.filePath, header + content, 'utf8');
+        let text;
+        if (plain) {
+            text = report.content.replace(/\r\n/g, '\n').trimEnd() + '\n';
+        } else {
+            const bodyStartsH1 = /^#\s/.test(String(report.content).trimStart());
+            const header = bodyStartsH1
+                ? `> 日期：${report.date || ''}\n\n`
+                : `# ${report.title || '工作日报'}\n\n> 日期：${report.date || ''}\n\n`;
+            const body = format === 'md' ? report.content : report.content
+                .replace(/^#+\s*/gm, '')
+                .replace(/\*\*(.+?)\*\*/g, '$1');
+            text = header + body;
+        }
+        fs.writeFileSync(result.filePath, text, 'utf8');
         return { success: true, path: result.filePath };
     } catch (err) {
         return { success: false, error: err.message };

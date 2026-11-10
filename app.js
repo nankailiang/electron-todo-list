@@ -24,7 +24,9 @@ const State = {
         dailyTime: '09:00',
         currentListId: 'all',
         currentView: 'list',
-        showDashboard: false
+        showDashboard: false,
+        reportAuthor: '',
+        reportStyle: 'plain'
     },
     filters: { search: '', status: 'all', priority: 'all', tag: 'all', start: '', end: '', archived: false, hideUnstarted: false },
     sort: { by: 'manual', dir: 'desc' },
@@ -1606,6 +1608,9 @@ function openReportModal() {
     $('report-empty').classList.remove('hidden');
     $('report-editor').classList.add('hidden');
     State.editingReport = null;
+    $('report-content-label').textContent = reportIsPlain()
+        ? '日志内容（逐条罗列，可直接复制到 OA）'
+        : '日报内容（支持 Markdown 段落）';
     renderReportHistory();
     openModal('report-modal');
 }
@@ -1640,11 +1645,18 @@ function openReport(id) {
     renderReportHistory();
 }
 
+// 日报默认标题：有署名用「姓名 工作日志」，没署名用「工作日志」
+function defaultReportTitle() {
+    const author = (State.settings.reportAuthor || '').trim();
+    return author ? `${author} 工作日志` : '工作日志';
+}
+function reportIsPlain() { return State.settings.reportStyle !== 'markdown'; }
+
 async function newReport() {
     const today = todayISO();
     State.editingReport = null;
     $('report-date').value = today;
-    $('report-title').value = `${today.replace(/-/g, '/')} 工作日报`;
+    $('report-title').value = defaultReportTitle();
     $('report-content').value = '';
     $('report-empty').classList.add('hidden');
     $('report-editor').classList.remove('hidden');
@@ -1655,14 +1667,14 @@ async function newReport() {
 async function generateReportContent(date) {
     const res = await window.electronAPI.generateReport(date);
     if (!res.success) { showNotification('生成失败: ' + res.error, 'error'); return; }
-    if (!$('report-title').value.trim()) $('report-title').value = `${date.replace(/-/g, '/')} 工作日报`;
+    if (!$('report-title').value.trim()) $('report-title').value = res.summary.title || defaultReportTitle();
     $('report-content').value = res.summary.defaultContent;
     showNotification('已根据当日任务生成日报草稿', 'success');
 }
 
 function saveReport() {
     const date = $('report-date').value || todayISO();
-    const title = $('report-title').value.trim() || `${date.replace(/-/g, '/')} 工作日报`;
+    const title = $('report-title').value.trim() || defaultReportTitle();
     const content = $('report-content').value;
     if (!content.trim()) { showNotification('日报内容不能为空', 'warning'); return; }
     const now = new Date().toISOString();
@@ -1695,10 +1707,11 @@ function deleteReport() {
 
 function exportReport() {
     const date = $('report-date').value || todayISO();
-    const title = $('report-title').value.trim() || '工作日报';
+    const title = $('report-title').value.trim() || defaultReportTitle();
     const content = $('report-content').value;
     if (!content.trim()) { showNotification('日报内容为空', 'warning'); return; }
-    window.electronAPI.exportReport({ format: 'md', report: { title, date, content } })
+    const style = State.settings.reportStyle === 'markdown' ? 'markdown' : 'plain';
+    window.electronAPI.exportReport({ format: style === 'markdown' ? 'md' : 'txt', style, report: { title, date, content } })
         .then(r => { if (r.success) showNotification('日报已导出', 'success'); else if (r.error !== '导出已取消') showNotification('导出失败: ' + r.error, 'error'); });
 }
 
@@ -1716,6 +1729,8 @@ function applySettingsToUI() {
     $('set-remind').checked = State.settings.remind;
     $('set-daily').checked = State.settings.dailyReminder;
     $('set-daily-time').value = State.settings.dailyTime;
+    $('set-report-author').value = State.settings.reportAuthor || '';
+    $('set-report-style').value = State.settings.reportStyle === 'markdown' ? 'markdown' : 'plain';
     $('set-encrypt').checked = !!State.settings.encrypt;
     $('sort-primary').value = State.sort.by;
     $('sort-dir').value = State.sort.dir;
@@ -2185,6 +2200,8 @@ function bindEvents() {
     $('set-remind').addEventListener('change', (e) => { State.settings.remind = e.target.checked; persist.settings(); });
     $('set-daily').addEventListener('change', (e) => { State.settings.dailyReminder = e.target.checked; persist.settings(); });
     $('set-daily-time').addEventListener('change', (e) => { State.settings.dailyTime = e.target.value; persist.settings(); });
+    $('set-report-author').addEventListener('input', (e) => { State.settings.reportAuthor = e.target.value.trim(); persist.settings(); });
+    $('set-report-style').addEventListener('change', (e) => { State.settings.reportStyle = e.target.value; persist.settings(); });
     $('set-encrypt').addEventListener('change', handleEncryptToggle);
 
     // 确认框

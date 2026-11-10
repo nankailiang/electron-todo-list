@@ -15,6 +15,7 @@
     "sync-ui": "node tauri-zhixing/scripts/sync-ui.mjs",
     "sync-ui:check": "node tauri-zhixing/scripts/sync-ui.mjs --check",
     "import-data": "node tools/backfill-import.mjs",
+    "import-logs": "node tools/import-wce-logs.mjs",
     "tauri:dev": "npm --prefix tauri-zhixing run dev",
     "tauri:build": "npm --prefix tauri-zhixing run build",
     "tauri:portable": "npm --prefix tauri-zhixing run build:portable"

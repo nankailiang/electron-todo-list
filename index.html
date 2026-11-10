@@ -505,6 +505,19 @@
                     </div>
                 </div>
 
+                <div class="setting-group-title">工作日报</div>
+                <div class="setting-row">
+                    <div class="setting-info"><div class="st">日志署名</div><div class="sd">生成的日志抬头，如「南开亮 工作日志」</div></div>
+                    <input type="text" id="set-report-author" class="form-control" style="width:150px;" placeholder="你的姓名">
+                </div>
+                <div class="setting-row">
+                    <div class="setting-info"><div class="st">日志格式</div><div class="sd">纯文本逐条罗列，或按状态分组的 Markdown 汇总</div></div>
+                    <select id="set-report-style" class="form-control" style="width:150px;">
+                        <option value="plain">纯文本日志</option>
+                        <option value="markdown">Markdown 汇总</option>
+                    </select>
+                </div>
+
                 <div class="setting-group-title">安全</div>
                 <div class="setting-row">
                     <div class="setting-info"><div class="st">本地数据加密</div><div class="sd">用口令加密保护任务数据</div></div>
@@ -560,12 +573,12 @@
                             </div>
                             <div class="form-group" style="flex:1;">
                                 <label class="form-label">标题</label>
-                                <input type="text" id="report-title" class="form-control" placeholder="如：7月22日 工作日报">
+                                <input type="text" id="report-title" class="form-control" placeholder="如：南开亮 工作日志">
                             </div>
                             <button class="btn btn-ghost btn-sm" id="report-generate"><svg class="icon"><use href="#i-refresh"/></svg> 从任务生成</button>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">日报内容（支持 Markdown 段落）</label>
+                            <label class="form-label" id="report-content-label">日志内容（逐条罗列，可直接复制到 OA）</label>
                             <textarea id="report-content" class="form-control report-textarea" placeholder="可手写，或点「从任务生成」自动汇总当日任务"></textarea>
                         </div>
                         <div class="report-actions">
