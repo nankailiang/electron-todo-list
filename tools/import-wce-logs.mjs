@@ -6,10 +6,20 @@
  * 纯文本日志合集，解析成可直接导入知行的任务 + 日报，产出两份 CSV，
  * 并可选地直接调用 backfill-import.mjs 写入数据目录。
  *
+ * 默认规则（mixed，贴近真实工作方式）：
+ *   · 日志里只有「完成」、从不出现进度的任务 → 每次出现都是独立个体，
+ *     每天都生成一条任务（例如「征信上报数据核对」130 天 = 130 条）。
+ *   · 日志里出现过进度（50% / 未完成 / 预计X完成）的任务 → 视为同一个
+ *     长期任务，跨天全部合并成一条，进度取最后一次记录。
+ *   · 合并后的长期任务默认也记为「已完成」（按天做完了），只有 --open
+ *     点名的任务保持「在办」并保留真实进度（例如 EAST 数据初始化）。
+ *   · 优先级按时间压力推断：跨天赶工 / 逾期完成 = 高，带预计完成日 = 中，
+ *     当天一次做完 = 低。
+ *
  * 用法：
  *   node tools/import-wce-logs.mjs "全部日志合集.txt"
  *   node tools/import-wce-logs.mjs "全部日志合集.txt" --out out/ --write
- *   node tools/import-wce-logs.mjs logs.txt --author 南开亮 --tag 历史日志 --write
+ *   node tools/import-wce-logs.mjs logs.txt --open "EAST业务系统数据初始化" --replace --write
  *
  * 参数：
  *   <log.txt>             日志合集文件（必填）
@@ -17,8 +27,14 @@
  *   --author <name>       抬头署名，日志里解析不出时兜底
  *   --tag <a,b>           给导入的任务打标签
  *   --list-id <id>        任务归入哪个清单，默认 default
- *   --gap <days>          同一任务跨天出现、间隔不超过 N 天视为同一条（默认 10）
- *   --no-merge            不做跨天合并，每条日志都生成一条任务
+ *   --open <a,b>          这些任务合并后保持「在办」+ 真实进度（子串匹配，可多次传）
+ *   --mode <mixed|all|none>
+ *                         mixed（默认）有进度才合并；all 全部按内容跨天合并；
+ *                         none 一律每天一条不合并
+ *   --gap <days>          all 模式下同一任务间隔不超过 N 天视为同一条（默认 10）
+ *   --merge / --no-merge  等价于 --mode all / --mode none
+ *   --priority <auto|off> auto（默认）按时间压力推断优先级；off 全部记为中
+ *   --replace             导入前先删掉旧的 wce- / wcerep- 记录（重跑本工具时用）
  *   --write               解析完直接导入（调用 backfill-import.mjs）
  *   --data-dir <dir>      数据目录，透传给 backfill-import
  *   --passphrase <p>      数据已加密时必填，透传给 backfill-import
@@ -37,7 +53,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 // 参数
 // ---------------------------------------------------------------------------
 const argv = process.argv.slice(2);
-const opt = { gap: 10, merge: true, listId: 'default', onConflict: 'skip', write: false };
+const opt = { gap: 10, mode: 'mixed', listId: 'default', onConflict: 'skip', write: false, open: [], priority: 'auto', replace: false };
 const positional = [];
 for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -46,8 +62,13 @@ for (let i = 0; i < argv.length; i++) {
     else if (a === '--author') opt.author = (next() || '').trim();
     else if (a === '--tag') opt.tag = next();
     else if (a === '--list-id') opt.listId = next();
+    else if (a === '--open') opt.open.push(...String(next() || '').split(/[,，]/));
+    else if (a === '--mode') opt.mode = String(next() || '').trim();
+    else if (a === '--priority') opt.priority = String(next() || '').trim();
     else if (a === '--gap') opt.gap = Math.max(0, Number(next()) || 10);
-    else if (a === '--no-merge') opt.merge = false;
+    else if (a === '--merge') opt.mode = 'all';
+    else if (a === '--no-merge') opt.mode = 'none';
+    else if (a === '--replace') opt.replace = true;
     else if (a === '--write') opt.write = true;
     else if (a === '--data-dir') opt.dataDir = next();
     else if (a === '--passphrase') opt.passphrase = next();
@@ -55,6 +76,16 @@ for (let i = 0; i < argv.length; i++) {
     else if (a === '-h' || a === '--help') opt.help = true;
     else if (a.startsWith('--')) { console.error(`未知参数: ${a}`); process.exit(1); }
     else positional.push(a);
+}
+
+opt.open = opt.open.map(s => s.trim()).filter(Boolean);
+if (!['mixed', 'all', 'none'].includes(opt.mode)) {
+    console.error('--mode 只能是 mixed / all / none');
+    process.exit(1);
+}
+if (!['auto', 'off'].includes(opt.priority)) {
+    console.error('--priority 只能是 auto / off');
+    process.exit(1);
 }
 
 if (opt.help || !positional.length) {
@@ -206,7 +237,52 @@ function parseLog(text) {
 // ---------------------------------------------------------------------------
 // 生成任务 / 日报
 // ---------------------------------------------------------------------------
+const cleanTags = () => (opt.tag || '').split(/[,，]/).map(s => s.trim()).filter(Boolean);
+
+/** --open 点名的任务：合并后保持「在办」并保留真实进度 */
+const isOpenTask = (content) => opt.open.some(n => content.includes(n));
+
+/**
+ * 紧急程度（优先级）推断 —— 以「完成时间」为主线，叠加任务本身的赶工特征：
+ *   · 仍在办（--open 点名）                        → 最高
+ *   · 逾期完成（完成日晚于预计完成日）              → 高
+ *   · 跨天拖了 ≥4 天 / ≥2 天赶工                    → 高 / 中
+ *   · 当天完成条目 ≥5 条（那天在赶工）              → +1
+ *   · 处在当月日均 ≥3.8 条的高压月份                → +1
+ * 汇总打分：≥4 高，2~3 中，≤1 低
+ */
+function urgencyOf({ days, eta, doneDate, open, ctx }) {
+    if (opt.priority === 'off') return 'medium';
+    let score = 0;
+    if (open) score += 4;
+    if (eta && doneDate && doneDate > eta) score += 3;
+    if (days >= 4) score += 3;
+    else if (days >= 2) score += 2;
+    if (eta) score += 1;
+    if ((ctx.dayCount.get(doneDate) || 0) >= 5) score += 1;
+    const load = ctx.monthLoad.get(String(doneDate || '').slice(0, 7)) || 0;
+    if (load >= 3.8) score += 1;
+    if (score >= 3) return 'high';
+    if (score >= 1) return 'medium';
+    return 'low';
+}
+
 function buildTasks(blocks) {
+    // 当天条目数 / 当月日均条目数：作为「那段时间忙不忙」的量化依据
+    const dayCount = new Map();
+    const monthDays = new Map();
+    const monthItems = new Map();
+    for (const b of blocks) {
+        const m = b.date.slice(0, 7);
+        dayCount.set(b.date, (dayCount.get(b.date) || 0) + b.items.length);
+        if (!monthDays.has(m)) monthDays.set(m, new Set());
+        monthDays.get(m).add(b.date);
+        monthItems.set(m, (monthItems.get(m) || 0) + b.items.length);
+    }
+    const monthLoad = new Map();
+    for (const [m, days] of monthDays) monthLoad.set(m, monthItems.get(m) / Math.max(1, days.size));
+    const ctx = { dayCount, monthLoad };
+
     // 同一天里重复出现的同名条目（导出的文件有整段重复）只留一条
     const perDay = new Map();
     for (const b of blocks) {
@@ -226,29 +302,33 @@ function buildTasks(blocks) {
         }
     }
 
-    if (!opt.merge) {
-        const tasks = [];
-        for (const [date, items] of [...perDay.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-            items.forEach((it, i) => tasks.push(toTask(it, [it], i)));
-        }
-        return { tasks, perDay };
-    }
-
-    // 按内容归组 → 连续出现（间隔 ≤ gap 天）的算同一条任务
-    const groups = new Map();
-    for (const [date, items] of perDay) {
+    const byContent = new Map();
+    for (const [, items] of perDay) {
         for (const it of items) {
-            if (!groups.has(it.content)) groups.set(it.content, []);
-            groups.get(it.content).push(it);
+            if (!byContent.has(it.content)) byContent.set(it.content, []);
+            byContent.get(it.content).push(it);
         }
     }
 
     const tasks = [];
-    for (const [content, items] of groups) {
+    const merged = [];
+    for (const [content, items] of byContent) {
         items.sort((a, b) => a.date.localeCompare(b.date));
+        const hasProgress = items.some(it => it.status === 'in-progress');
+        const mergeThis = opt.mode === 'all' || (opt.mode === 'mixed' && hasProgress);
+
+        if (!mergeThis) {
+            // 每天都发生过、且从不带进度 → 每次都是独立个体，一天一条
+            for (const it of items) tasks.push(toDailyTask(content, it, ctx));
+            continue;
+        }
+
+        // 有进度 → 同一个长期任务：连续出现（间隔 ≤ gap 天）的一段合并成一条
         let run = [];
         const flush = () => {
-            if (run.length) tasks.push(toTask(run[run.length - 1], run, tasks.length));
+            if (!run.length) return;
+            tasks.push(toMergedTask(content, run, ctx));
+            merged.push({ content, days: run.length, from: run[0].date, to: run[run.length - 1].date });
             run = [];
         };
         for (const it of items) {
@@ -257,37 +337,66 @@ function buildTasks(blocks) {
         }
         flush();
     }
+
     tasks.sort((a, b) => (a.startDate || a.date).localeCompare(b.startDate || b.date));
     tasks.forEach((t, i) => { t.order = i; });
-    return { tasks, perDay };
+    return { tasks, perDay, merged };
 }
 
-function toTask(last, run, index) {
+/** 当天一次做完的独立任务 */
+function toDailyTask(content, it, ctx) {
+    return {
+        id: stableId('wce', `${content}|${it.date}`),
+        content,
+        note: '',
+        priority: urgencyOf({ days: 1, eta: it.eta, doneDate: it.date, open: false, ctx }),
+        status: 'completed',
+        progress: 100,
+        listId: opt.listId,
+        date: it.date,
+        startDate: '',
+        dueTime: '',
+        tags: cleanTags().join('|'),
+        createdAt: isoOf(it.date, 9),
+        startedAt: isoOf(it.date, 10),
+        completedAt: isoOf(it.date, 18),
+        archived: 'false',
+        order: 0,
+    };
+}
+
+/** 有进度记录的长期任务（跨天合并成一条） */
+function toMergedTask(content, run, ctx) {
     const first = run[0];
-    const done = last.status === 'completed';
-    const date = last.eta || last.date;
-    const tags = (opt.tag || '').split(/[,，]/).map(s => s.trim()).filter(Boolean);
+    const last = run[run.length - 1];
+    const days = run.length;
+    const open = isOpenTask(content);
+    const eta = last.eta || '';
+    const progress = last.progress || 0;
+    const date = open ? (eta || last.date) : last.date;
+
     const noteParts = [];
-    if (run.length > 1) noteParts.push(`日志 ${first.date} ~ ${last.date}（${run.length} 天）`);
-    if (last.eta && last.eta !== last.date) noteParts.push(`原计划 ${last.eta} 完成`);
+    if (days > 1) noteParts.push(`日志 ${first.date} ~ ${last.date}（${days} 天）`);
+    if (eta) noteParts.push(open ? `预计 ${eta} 完成` : `原计划 ${eta} 完成`);
+    if (days > 1) noteParts.push(`进度轨迹 ${run.map(it => `${it.progress || 0}%`).join(' → ')}`);
 
     return {
-        id: stableId('wce', `${last.content}|${first.date}`),
-        content: last.content,
+        id: stableId('wce', `${content}|${first.date}`),
+        content,
         note: noteParts.join('；'),
-        priority: 'medium',
-        status: last.status,
-        progress: done ? 100 : (last.progress || 0),
+        priority: urgencyOf({ days, eta, doneDate: last.date, open, ctx }),
+        status: open ? 'in-progress' : 'completed',
+        progress: open ? progress : 100,
         listId: opt.listId,
         date,
         startDate: first.date === date ? '' : first.date,
         dueTime: '',
-        tags: tags.join('|'),
+        tags: cleanTags().join('|'),
         createdAt: isoOf(first.date, 9),
-        startedAt: last.status === 'pending' ? '' : isoOf(first.date, 10),
-        completedAt: done ? isoOf(last.date, 18) : '',
+        startedAt: isoOf(first.date, 10),
+        completedAt: open ? '' : isoOf(last.date, 18),
         archived: 'false',
-        order: index,
+        order: 0,
     };
 }
 
@@ -323,7 +432,7 @@ const blocks = parseLog(readText(SRC));
 if (!blocks.length) { console.error('✗ 没有解析到任何日志条目，请检查文件格式'); process.exit(1); }
 
 const authorFromLog = blocks.map(b => b.author).filter(Boolean)[0] || '';
-const { tasks, perDay } = buildTasks(blocks);
+const { tasks, perDay, merged } = buildTasks(blocks);
 // perDay 里补上作者，供日报抬头使用
 for (const [date, items] of perDay) {
     const b = blocks.find(x => x.date === date);
@@ -332,11 +441,14 @@ for (const [date, items] of perDay) {
 const reports = buildReports(perDay, opt.author || authorFromLog);
 
 const itemCount = blocks.reduce((n, b) => n + b.items.length, 0);
+const dedupCount = [...perDay.values()].reduce((n, arr) => n + arr.length, 0);
 const stat = {
     completed: tasks.filter(t => t.status === 'completed').length,
     inProgress: tasks.filter(t => t.status === 'in-progress').length,
     pending: tasks.filter(t => t.status === 'pending').length,
 };
+const dailyCount = tasks.length - merged.length;
+const byPriority = (p) => tasks.filter(t => t.priority === p).length;
 
 const outDir = opt.out ? resolve(opt.out) : join(dirname(SRC), `知行导入-${stamp()}`);
 mkdirSync(outDir, { recursive: true });
@@ -350,9 +462,50 @@ writeFileSync(reportsPath, toCSV(
     ['id', 'date', 'title', 'content', 'createdAt', 'updatedAt'],
     reports), 'utf8');
 
-console.log(`\n日志 ${blocks.length} 天 / 条目 ${itemCount} 条`);
-console.log(`任务 ${tasks.length} 条（完成 ${stat.completed}，在办 ${stat.inProgress}，待办 ${stat.pending}）${opt.merge ? '，已按内容合并跨天记录' : '，按日明细不合并'}`);
+const modeDesc = { mixed: '有进度的合并、纯完成的每天独立', all: '全部按内容合并', none: '全部按天不合并' }[opt.mode];
+console.log(`\n日志 ${blocks.length} 天 / 条目 ${itemCount} 条（同日去重后 ${dedupCount} 条）`);
+console.log(`任务 ${tasks.length} 条（完成 ${stat.completed}，在办 ${stat.inProgress}，待办 ${stat.pending}）· ${modeDesc}`);
+console.log(`  · 当天完成的独立任务：${dailyCount} 条`);
+console.log(`  · 跨天长期任务：${merged.length} 条${merged.length ? `（${merged.map(m => m.content).slice(0, 3).join('、')}${merged.length > 3 ? ' 等' : ''}）` : ''}`);
+console.log(`  紧急程度：高 ${byPriority('high')} / 中 ${byPriority('medium')} / 低 ${byPriority('low')}`);
+if (opt.open.length) console.log(`  --open 保持在办：${tasks.filter(t => t.status === 'in-progress').map(t => `${t.content}(${t.progress}%)`).join('、') || '无命中'}`);
 console.log(`日报 ${reports.length} 篇：${reports[0].date} ~ ${reports[reports.length - 1].date}`);
+
+const highs = tasks.filter(t => t.priority === 'high');
+if (highs.length) {
+    console.log('\n高优先级（按完成时间排在冲刺期 / 跨天赶工 / 逾期）：');
+    highs.slice(0, 12).forEach(t => console.log(`  · ${t.startDate || t.date}${t.startDate ? ' ~ ' + t.date : ''}  ${t.content.slice(0, 34)}${t.status === 'in-progress' ? `（在办 ${t.progress}%）` : ''}`));
+    if (highs.length > 12) console.log(`  · …另有 ${highs.length - 12} 条`);
+}
+
+// ---- 按月的节奏 / 紧急度粗判断 ----
+{
+    const months = new Map();
+    for (const b of blocks) {
+        const m = b.date.slice(0, 7);
+        const cur = months.get(m) || { items: 0, days: new Set() };
+        cur.items += b.items.length;
+        cur.days.add(b.date);
+        months.set(m, cur);
+    }
+    for (const t of merged) {
+        const m = t.from.slice(0, 7);
+        const cur = months.get(m) || { items: 0, days: new Set() };
+        cur.long = (cur.long || 0) + 1;
+        months.set(m, cur);
+    }
+    const hot = new Map();
+    for (const t of tasks.filter(x => x.priority === 'high')) {
+        const m = (t.startDate || t.date).slice(0, 7);
+        hot.set(m, (hot.get(m) || 0) + 1);
+    }
+    console.log('\n月度节奏（条目数 / 跨天任务 / 高优先级）：');
+    for (const [m, v] of [...months.entries()].sort()) {
+        const perDay = (v.items / Math.max(1, v.days.size)).toFixed(1);
+        const level = (hot.get(m) || 0) >= 4 ? '紧凑' : (hot.get(m) || 0) >= 2 ? '偏紧' : '常规';
+        console.log(`  ${m}  条目 ${String(v.items).padStart(3)}  日均 ${perDay} 条  跨天任务 ${String(v.long || 0).padStart(2)}  高优先级 ${String(hot.get(m) || 0).padStart(2)}  ${level}`);
+    }
+}
 
 if (warnings.length) {
     console.log(`\n⚠️  ${warnings.length} 条解析提醒`);
@@ -366,16 +519,22 @@ console.log(`  ${reportsPath}`);
 
 if (!opt.write) {
     console.log('\n—— 未写入数据目录（演练模式） ——');
-    const parts = [`node tools/import-wce-logs.mjs "${SRC}"`, `--out "${outDir}"`, '--write'];
+    const parts = [`node tools/import-wce-logs.mjs "${SRC}"`, `--out "${outDir}"`];
+    if (opt.open.length) parts.push(`--open "${opt.open.join(',')}"`);
+    if (opt.mode !== 'mixed') parts.push(`--mode ${opt.mode}`);
+    if (opt.priority !== 'auto') parts.push(`--priority ${opt.priority}`);
+    if (opt.replace) parts.push('--replace');
     if (opt.dataDir) parts.push(`--data-dir "${opt.dataDir}"`);
     if (opt.onConflict !== 'skip') parts.push(`--on-conflict ${opt.onConflict}`);
-    console.log(`确认 CSV 没问题后加 --write 导入：\n  ${parts.join(' ')}`);
-    console.log(`也可以直接用补录工具：\n  node tools/backfill-import.mjs --tasks "${tasksPath}" --reports "${reportsPath}" --write`);
+    parts.push('--write');
+    console.log(`确认 CSV 没问题后这样导入：\n  ${parts.join(' ')}`);
+    console.log(`也可以直接用补录工具：\n  node tools/backfill-import.mjs --tasks "${tasksPath}" --reports "${reportsPath}"${opt.replace ? ' --prune wce,wcerep' : ''} --write`);
     process.exit(0);
 }
 
 const args = [join(HERE, 'backfill-import.mjs'), '--tasks', tasksPath, '--reports', reportsPath,
     '--on-conflict', opt.onConflict, '--write'];
+if (opt.replace) args.push('--prune', 'wce,wcerep');
 if (opt.dataDir) args.push('--data-dir', opt.dataDir);
 if (opt.passphrase) args.push('--passphrase', opt.passphrase);
 

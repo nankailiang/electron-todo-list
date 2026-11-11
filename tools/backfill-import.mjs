@@ -24,10 +24,12 @@
  *   --data-dir <dir>      数据目录（默认自动探测 Electron 的 %APPDATA%\zhixing）
  *   --passphrase <p>      数据已加密时必填
  *   --on-conflict <skip|overwrite>   重复时怎么办，默认 skip
+ *   --prune <a,b>         先删掉 id 以这些前缀开头的旧记录（重跑导入工具时用，
+ *                         例如 --prune wce,wcerep 清掉上一次日志解析的结果）
  *   --write               真正写入（不加则为演练）
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, renameSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, renameSync, rmSync } from 'node:fs';
 import { join, resolve, basename, extname } from 'node:path';
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto';
 import { homedir } from 'node:os';
@@ -45,6 +47,7 @@ for (let i = 0; i < argv.length; i++) {
     else if (a === '--data-dir') opt.dataDir = next();
     else if (a === '--passphrase') opt.passphrase = next();
     else if (a === '--on-conflict') opt.onConflict = next();
+    else if (a === '--prune') opt.prune = String(next() || '').split(/[,，]/).map(s => s.trim()).filter(Boolean);
     else if (a === '--write') opt.write = true;
     else if (a === '-h' || a === '--help') opt.help = true;
     else { console.error(`未知参数: ${a}`); process.exit(1); }
@@ -143,9 +146,24 @@ function readDataFile(p) {
 function writeDataFile(p, data, encrypted) {
     let content = JSON.stringify(data, null, 2);
     if (encrypted) content = encryptString(content, cryptoKey);
+    if (process.env.ZHIXING_NO_RENAME === '1') {
+        // 某些沙箱/受控环境禁止 rename，只能原地覆盖写
+        writeFileSync(p, content, 'utf8');
+        return;
+    }
     const tmp = p + '.tmp';
     writeFileSync(tmp, content, 'utf8');
-    renameSync(tmp, p);
+    try {
+        renameSync(tmp, p);
+    } catch (e) {
+        // rename 被拦截时退化为原地写，避免留下 .tmp 且把数据写丢
+        if (e.code === 'EPERM' || e.code === 'EACCES' || e.code === 'EXDEV') {
+            writeFileSync(p, content, 'utf8');
+            try { rmSync(tmp, { force: true }); } catch { /* 忽略 */ }
+            return;
+        }
+        throw e;
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -382,6 +400,21 @@ const reportState = readDataFile(P_REPORTS);
 const existingTodos = Array.isArray(todoState.data) ? todoState.data : [];
 const existingReports = Array.isArray(reportState.data) ? reportState.data : [];
 
+// ---- 先裁剪上次导入的旧记录（--prune wce,wcerep） ----
+const pruneHits = (id) => opt.prune.some(p => String(id || '').startsWith(p));
+const pruned = { todos: 0, reports: 0 };
+if (opt.prune && opt.prune.length) {
+    const keptTodos = existingTodos.filter(t => !pruneHits(t.id));
+    const keptReports = existingReports.filter(r => !pruneHits(r.id));
+    pruned.todos = existingTodos.length - keptTodos.length;
+    pruned.reports = existingReports.length - keptReports.length;
+    existingTodos.length = 0;
+    existingTodos.push(...keptTodos);
+    existingReports.length = 0;
+    existingReports.push(...keptReports);
+    console.log(`\n[清理] 旧导入记录：任务 ${pruned.todos} 条、日报 ${pruned.reports} 条（前缀 ${opt.prune.join(', ')}）`);
+}
+
 const exists = {
     todoById: new Map(existingTodos.filter(t => t && t.id).map(t => [String(t.id), t])),
     todoByKey: new Map(existingTodos.filter(t => t && t.content)
@@ -468,7 +501,9 @@ if (warnings.length) {
 }
 
 // ---- 写盘 ----
-const willWrite = (result.tasks?.add || result.tasks?.overwrite) || (result.reports?.add || result.reports?.overwrite);
+const willWrite = pruned.todos || pruned.reports
+    || (result.tasks?.add || result.tasks?.overwrite)
+    || (result.reports?.add || result.reports?.overwrite);
 
 if (!opt.write) {
     console.log('\n—— 演练模式，未写入任何文件 ——');
@@ -496,10 +531,10 @@ for (const p of [P_TODOS, P_REPORTS]) {
 console.log(`\n已备份原数据 → ${backupDir}`);
 
 try {
-    if (result.tasks && (result.tasks.add || result.tasks.overwrite)) {
+    if (pruned.todos || (result.tasks && (result.tasks.add || result.tasks.overwrite))) {
         writeDataFile(P_TODOS, existingTodos, todoState.encrypted);
     }
-    if (result.reports && (result.reports.add || result.reports.overwrite)) {
+    if (pruned.reports || (result.reports && (result.reports.add || result.reports.overwrite))) {
         writeDataFile(P_REPORTS, existingReports, reportState.encrypted);
     }
 } catch (e) {
