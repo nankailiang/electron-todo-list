@@ -107,6 +107,7 @@ backups/          # 每日备份 todo-backup-YYYY-MM-DD.json，保留 7 天（�
 - **归档**：任务有 `archived`，默认列表不显示，筛选面板可“显示归档”。
 - 导入 CSV 已支持“引号内含换行”的备注（重写过解析器）。
 - 未签名 exe 首次运行会被 SmartScreen 拦，属正常。
+- **`.chart-card .chart-body` 是 `display:flex` + `wrap` + `justify-content:center`**：图表自身的多行内容（如标签分布的行）直接塞进去会被折成多列、`flex:1` 的子元素宽度塌成 0。要放多行列表的图表容器必须自己覆盖为 `display:block`（参考 `#tag-chart`）。
 
 ---
 
