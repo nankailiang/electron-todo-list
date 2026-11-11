@@ -26,7 +26,10 @@ const State = {
         currentView: 'list',
         showDashboard: false,
         reportAuthor: '',
-        reportStyle: 'plain'
+        reportStyle: 'plain',
+        exportColumns: null,
+        exportFormat: 'csv',
+        exportScope: 'visible'
     },
     filters: { search: '', status: 'all', priority: 'all', tag: 'all', start: '', end: '', archived: false, hideUnstarted: false },
     sort: { by: 'manual', dir: 'desc' },
@@ -920,6 +923,8 @@ function openTaskModal(task) {
     $('f-repeat-interval').value = isEdit && task.repeat ? (task.repeat.interval || 3) : 3;
     $('f-repeat-interval').classList.toggle('hidden', $('f-repeat').value !== 'custom');
     setModalProgress(isEdit ? storedProgress(task) : 0);
+    $('f-created').value = isoToLocalInput(isEdit ? task.createdAt : new Date().toISOString());
+    $('f-completed').value = isEdit ? isoToLocalInput(task.completedAt) : '';
 
     // 清单下拉
     const listSel = $('f-list');
@@ -940,6 +945,38 @@ function setModalProgress(v) {
     if (range) range.value = p;
     if (num) num.value = p;
     if (label) label.textContent = p + '%';
+}
+
+// ---- 时间字段：ISO(UTC) ↔ <input type="datetime-local"> 的本地时间字符串 ----
+function toDateSafe(v) {
+    if (!v) return null;
+    if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+    let s = String(v).trim();
+    if (!s) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) s += 'T00:00:00';
+    else if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(s)) s = s.replace(' ', 'T');
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+}
+
+function isoToLocalInput(iso) {
+    const d = toDateSafe(iso);
+    if (!d) return '';
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function localInputToIso(v) {
+    const d = toDateSafe(v);
+    return d ? d.toISOString() : '';
+}
+
+// 输入框只到分钟，若和原值同一分钟就保留原字符串，避免手滑改别的字段时把秒抹掉
+function keepSeconds(iso, original) {
+    if (!iso || !original) return iso;
+    const od = toDateSafe(original);
+    if (!od) return iso;
+    return iso.slice(0, 16) === od.toISOString().slice(0, 16) ? original : iso;
 }
 
 function renderSubtaskEditor() {
@@ -963,6 +1000,9 @@ function saveTaskFromModal() {
     const repeatType = $('f-repeat').value;
     const subtasks = State.editingSubtasks.filter(s => s.text.trim()).map(s => ({ id: s.id || uid(), text: s.text.trim(), done: !!s.done }));
     const existing = id ? findTask(id) : null;
+    const createdIso = keepSeconds(localInputToIso($('f-created').value), existing && existing.createdAt)
+        || (existing ? existing.createdAt : new Date().toISOString());
+    const completedIso = keepSeconds(localInputToIso($('f-completed').value), existing && existing.completedAt) || null;
 
     const payload = {
         content,
@@ -975,7 +1015,9 @@ function saveTaskFromModal() {
         tags,
         repeat: { type: repeatType, interval: parseInt($('f-repeat-interval').value) || 1 },
         progress: (existing && existing.status === 'completed') ? 100 : clampProgress($('f-progress-num').value),
-        subtasks
+        subtasks,
+        createdAt: createdIso,
+        completedAt: completedIso
     };
 
     if (id) {
@@ -986,8 +1028,12 @@ function saveTaskFromModal() {
         const now = new Date().toISOString();
         const maxOrder = Math.max(0, ...State.todos.map(t => t.order || 0));
         State.todos.unshift({
-            id: uid(), ...payload, status: 'pending', pinned: false, archived: false,
-            order: maxOrder + 1, createdAt: now, startedAt: null, completedAt: null, updatedAt: now
+            id: uid(), ...payload,
+            // 补录历史任务时直接填完成时间，则按已结办入库
+            status: completedIso ? 'completed' : 'pending',
+            progress: completedIso ? 100 : clampProgress($('f-progress-num').value),
+            pinned: false, archived: false,
+            order: maxOrder + 1, startedAt: null, updatedAt: now
         });
         showNotification('任务添加成功', 'success');
     }
@@ -1510,10 +1556,123 @@ function syncFilterUI() {
 // ---------------------------------------------------------------------------
 // 导入 / 导出
 // ---------------------------------------------------------------------------
-async function doExport(format) {
-    const visible = getVisibleTodos();
-    if (!visible.length) { showNotification('当前筛选无任务可导出', 'warning'); return; }
-    const res = await window.electronAPI.exportTodos({ format, todos: visible });
+// 导出字段：前 14 项与导入模板 tools/templates/tasks.csv 完全一致，
+// 保证「导出 → 再导入」不丢字段、不需要手工改表头。
+const EXPORT_COLUMNS = [
+    { key: 'content', label: '任务内容', locked: true, tpl: true },
+    { key: 'date', label: '截止日期', tpl: true },
+    { key: 'startDate', label: '开始日期', tpl: true },
+    { key: 'dueTime', label: '时间点', tpl: true },
+    { key: 'priority', label: '优先级', tpl: true },
+    { key: 'status', label: '状态', tpl: true },
+    { key: 'progress', label: '完成度', tpl: true },
+    { key: 'tags', label: '标签', tpl: true },
+    { key: 'note', label: '备注', tpl: true },
+    { key: 'listId', label: '所属清单', tpl: true },
+    { key: 'createdAt', label: '创建时间', tpl: true },
+    { key: 'startedAt', label: '开始时间', tpl: true },
+    { key: 'completedAt', label: '完成时间', tpl: true },
+    { key: 'archived', label: '归档', tpl: true },
+    { key: 'id', label: '任务 ID' },
+    { key: 'repeat', label: '重复周期' },
+    { key: 'subtasks', label: '子任务' },
+    { key: 'pinned', label: '置顶' },
+    { key: 'order', label: '排序号' },
+    { key: 'updatedAt', label: '更新时间' }
+];
+const EXPORT_COLUMN_KEYS = EXPORT_COLUMNS.map(c => c.key);
+
+function exportColumns() {
+    const saved = State.settings.exportColumns;
+    if (!Array.isArray(saved)) return [...EXPORT_COLUMN_KEYS];
+    const valid = saved.filter(k => EXPORT_COLUMN_KEYS.includes(k));
+    return valid.includes('content') ? valid : ['content', ...valid];
+}
+
+function openExportModal() {
+    const visible = getVisibleTodos().length;
+    $('export-visible-count').textContent = visible;
+    $('export-all-count').textContent = State.todos.length;
+    const fmt = ['csv', 'json', 'txt', 'md'].includes(State.settings.exportFormat) ? State.settings.exportFormat : 'csv';
+    const scope = State.settings.exportScope === 'all' ? 'all' : 'visible';
+    const fr = document.querySelector(`input[name="export-format"][value="${fmt}"]`);
+    if (fr) fr.checked = true;
+    const sr = document.querySelector(`input[name="export-scope"][value="${scope}"]`);
+    if (sr) sr.checked = true;
+    renderExportColumns();
+    updateExportFormatHint();
+    openModal('export-modal');
+}
+
+// TXT / Markdown 是整篇可读文本，字段固定输出全部，不需要勾选列
+function updateExportFormatHint() {
+    const format = (document.querySelector('input[name="export-format"]:checked') || {}).value || 'csv';
+    const tabular = format === 'csv' || format === 'json';
+    const box = $('export-cols');
+    if (box) {
+        box.style.opacity = tabular ? '1' : '0.45';
+        box.style.pointerEvents = tabular ? 'auto' : 'none';
+    }
+    const hint = $('export-hint');
+    if (hint) {
+        hint.textContent = tabular
+            ? 'CSV 前 14 列与导入模板完全一致，导出的文件可以原样再导入；「任务内容」为必选列。'
+            : `${format.toUpperCase()} 是整篇可读文本，会输出全部字段（含创建/完成时间、子任务），不受上方勾选影响。`;
+    }
+}
+
+function renderExportColumns() {
+    const picked = new Set(exportColumns());
+    const cell = (c) => `<label class="${c.locked ? 'locked' : ''}" title="${c.key}${c.tpl ? '（导入模板字段）' : ''}">
+            <input type="checkbox" value="${c.key}" ${picked.has(c.key) ? 'checked' : ''} ${c.locked ? 'disabled' : ''}>
+            <span>${c.label}</span>
+        </label>`;
+    const tpl = EXPORT_COLUMNS.filter(c => c.tpl);
+    const ext = EXPORT_COLUMNS.filter(c => !c.tpl);
+    $('export-cols').innerHTML =
+        `<div class="export-col-group">导入模板字段（${tpl.length}）· 与 tasks.csv 表头一致</div>` +
+        tpl.map(cell).join('') +
+        `<div class="export-col-group">扩展字段（${ext.length}）</div>` +
+        ext.map(cell).join('');
+    $('export-cols').querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', () => {
+            const cur = new Set(exportColumns());
+            if (cb.checked) cur.add(cb.value); else cur.delete(cb.value);
+            // 按固定顺序存，避免下次导出的列序漂移
+            State.settings.exportColumns = EXPORT_COLUMN_KEYS.filter(k => cur.has(k));
+            updateExportColCount();
+        });
+    });
+    updateExportColCount();
+}
+
+function updateExportColCount() {
+    const n = $('export-cols').querySelectorAll('input[type="checkbox"]:checked').length;
+    const total = EXPORT_COLUMNS.length;
+    $('export-col-count').textContent = `${n}/${total}`;
+}
+
+function syncExportColChecks(keys) {
+    $('export-cols').querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = cb.disabled ? true : keys.includes(cb.value);
+    });
+    State.settings.exportColumns = EXPORT_COLUMN_KEYS.filter(k => keys.includes(k));
+    updateExportColCount();
+}
+
+async function confirmExport() {
+    const format = (document.querySelector('input[name="export-format"]:checked') || {}).value || 'csv';
+    const scope = (document.querySelector('input[name="export-scope"]:checked') || {}).value || 'visible';
+    const columns = exportColumns();
+    const todos = scope === 'all' ? [...State.todos] : getVisibleTodos();
+    if (!todos.length) { showNotification('没有可导出的任务', 'warning'); return; }
+
+    State.settings.exportFormat = format;
+    State.settings.exportScope = scope;
+    persist.settings();
+    closeModal('export-modal');
+
+    const res = await window.electronAPI.exportTodos({ format, todos, columns });
     if (res.success) showNotification(`已导出 ${res.count} 条任务`, 'success');
     else if (res.error !== '导出已取消') showNotification('导出失败: ' + res.error, 'error');
 }
@@ -2113,7 +2272,12 @@ function bindEvents() {
     });
 
     // 导入导出
-    $('export-select').addEventListener('change', (e) => { if (e.target.value) { doExport(e.target.value); e.target.value = ''; } });
+    $('open-export').addEventListener('click', openExportModal);
+    $('confirm-export').addEventListener('click', confirmExport);
+    $('export-col-all').addEventListener('click', () => syncExportColChecks([...EXPORT_COLUMN_KEYS]));
+    $('export-col-none').addEventListener('click', () => syncExportColChecks(['content']));
+    $('export-col-reset').addEventListener('click', () => syncExportColChecks([...EXPORT_COLUMN_KEYS]));
+    document.querySelectorAll('input[name="export-format"]').forEach(r => r.addEventListener('change', updateExportFormatHint));
     $('import-select').addEventListener('change', (e) => { if (e.target.value) { doImport(e.target.value); e.target.value = ''; } });
     $('confirm-import').addEventListener('click', confirmImport);
 

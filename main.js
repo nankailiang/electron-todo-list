@@ -337,13 +337,21 @@ function buildReportSummary(todos, dateStr) {
 
     // 当天到期 / 当天完成
     const due = scope.filter(t => !t.archived && (t.date === dateStr || t.startDate === dateStr));
-    const completed = scope.filter(t => !t.archived && (
-        (t.status === 'completed' && (t.date === dateStr || day(t) === dateStr)) ||
-        (t.completedAt && String(t.completedAt).slice(0, 10) === dateStr)
-    ));
+    // 完成的按「完成时间」从早到晚排，先完成的写在前面的条目（同刻完成保持原有顺序，sort 稳定）
+    const doneAt = (t) => String(t.completedAt || t.updatedAt || `${t.date || ''}T23:59`);
+    const completed = scope
+        .filter(t => !t.archived && (
+            (t.status === 'completed' && (t.date === dateStr || day(t) === dateStr)) ||
+            (t.completedAt && String(t.completedAt).slice(0, 10) === dateStr)
+        ))
+        .sort((a, b) => doneAt(a).localeCompare(doneAt(b)));
     // 在办：截止日可能在未来，只要当天已经开始就算「今天在干这件事」
-    const inProgress = scope.filter(t => !t.archived && t.status === 'in-progress' && (!startedOn(t) || startedOn(t) <= dateStr));
-    const pending = due.filter(t => t.status === 'pending');
+    const inProgress = scope
+        .filter(t => !t.archived && t.status === 'in-progress' && (!startedOn(t) || startedOn(t) <= dateStr))
+        .sort((a, b) => startedOn(a).localeCompare(startedOn(b)) || String(a.date || '').localeCompare(String(b.date || '')));
+    const pending = due
+        .filter(t => t.status === 'pending')
+        .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.dueTime || '').localeCompare(String(b.dueTime || '')));
     // 逾期未完成：截止日期早于当日且未结办
     const overdue = scope.filter(t => !t.archived && t.status !== 'completed' && t.date && t.date < dateStr);
 
@@ -586,24 +594,61 @@ ipcMain.handle('backup-now', () => {
 const STATUS_MAP = { pending: '待办', 'in-progress': '在办', completed: '结办' };
 const PRIORITY_MAP = { high: '高', medium: '中', low: '低' };
 
-ipcMain.handle('export-todos', async (e, { format, todos }) => {
+// CSV 表头顺序与导入模板 tools/templates/tasks.csv 完全一致，导出文件可直接再导入
+const CSV_COLUMN_ORDER = ['content', 'date', 'startDate', 'dueTime', 'priority', 'status', 'progress', 'tags', 'note',
+    'listId', 'createdAt', 'startedAt', 'completedAt', 'archived', 'id', 'repeat', 'subtasks', 'pinned', 'order', 'updatedAt'];
+
+/** 把列参数整理成稳定顺序（未知列忽略，content 必需） */
+function pickColumns(columns) {
+    const wanted = Array.isArray(columns) && columns.length
+        ? new Set(columns.filter(c => CSV_COLUMN_ORDER.includes(c)))
+        : new Set(CSV_COLUMN_ORDER);
+    wanted.add('content');
+    return CSV_COLUMN_ORDER.filter(c => wanted.has(c));
+}
+
+/** 单个单元格取值：统一成 CSV 里可读、可再导入的字符串 */
+function cellOf(t, key) {
+    switch (key) {
+        case 'progress': return String(t.status === 'completed' ? 100 : clampProgress(t.progress));
+        case 'tags': return (Array.isArray(t.tags) ? t.tags : []).join('|');
+        case 'archived': return t.archived ? 'true' : 'false';
+        case 'pinned': return t.pinned ? 'true' : 'false';
+        case 'repeat': return t.repeat && t.repeat.type && t.repeat.type !== 'none' ? JSON.stringify(t.repeat) : '';
+        case 'subtasks': return (Array.isArray(t.subtasks) && t.subtasks.length) ? JSON.stringify(t.subtasks) : '';
+        case 'order': return (t.order === undefined || t.order === null) ? '' : String(t.order);
+        default: {
+            const v = t[key];
+            if (v === undefined || v === null) return '';
+            return String(v);
+        }
+    }
+}
+
+function csvCell(s) {
+    const v = String(s === undefined || s === null ? '' : s);
+    return /[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+}
+
+ipcMain.handle('export-todos', async (e, { format, todos, columns }) => {
     try {
         const list = Array.isArray(todos) ? todos : readTodos();
         if (!Array.isArray(list) || list.length === 0) {
             return { success: false, error: '没有可导出的任务' };
         }
+        const cols = pickColumns(columns);
 
         const result = await dialog.showSaveDialog({
             title: '导出待办事项',
-            defaultPath: path.join(app.getPath('downloads'), `todo-export-${Date.now()}.${format}`),
+            defaultPath: path.join(app.getPath('downloads'), `知行-任务-${new Date().toISOString().slice(0, 10)}-${Date.now().toString().slice(-5)}.${format}`),
             filters: [{ name: `${format.toUpperCase()} Files`, extensions: [format] }, { name: 'All Files', extensions: ['*'] }]
         });
         if (result.canceled) return { success: false, error: '导出已取消' };
 
         let content = '';
         switch (format) {
-            case 'json': content = JSON.stringify(list, null, 2); break;
-            case 'csv': content = toCSV(list); break;
+            case 'json': content = JSON.stringify(list.map(t => projectTodo(t, cols)), null, 2); break;
+            case 'csv': content = toCSV(list, cols); break;
             case 'txt': content = toTXT(list); break;
             case 'md': content = toMarkdown(list); break;
             default: return { success: false, error: '不支持的格式' };
@@ -616,19 +661,25 @@ ipcMain.handle('export-todos', async (e, { format, todos }) => {
     }
 });
 
-function toCSV(todos) {
-    const headers = ['id', 'listId', 'startDate', 'date', 'dueTime', 'priority', 'content', 'note', 'status', 'progress', 'tags', 'createdAt', 'startedAt', 'completedAt'];
-    let csv = headers.join(',') + '\n';
+/** JSON 导出按勾选的列投影，未勾选的字段不出现 */
+function projectTodo(t, cols) {
+    const out = {};
+    cols.forEach(k => {
+        if (k === 'progress') out.progress = t.status === 'completed' ? 100 : clampProgress(t.progress);
+        else if (k === 'tags') out.tags = Array.isArray(t.tags) ? t.tags : [];
+        else if (k === 'subtasks') out.subtasks = Array.isArray(t.subtasks) ? t.subtasks : [];
+        else if (k === 'archived' || k === 'pinned') out[k] = !!t[k];
+        else out[k] = t[k] === undefined ? null : t[k];
+    });
+    return out;
+}
+
+function toCSV(todos, columns) {
+    const cols = Array.isArray(columns) && columns.length ? columns : CSV_COLUMN_ORDER;
+    // 加 BOM，Excel 打开中文不乱码；解析导入时会自动去掉
+    let csv = '\uFEFF' + cols.join(',') + '\n';
     todos.forEach(t => {
-        const row = [
-            t.id, t.listId || '', t.startDate || '', t.date || '', t.dueTime || '', t.priority || '',
-            `"${(t.content || '').replace(/"/g, '""')}"`,
-            `"${(t.note || '').replace(/"/g, '""')}"`,
-            t.status || '', t.status === 'completed' ? 100 : clampProgress(t.progress),
-            `"${(t.tags || []).join('|')}"`,
-            t.createdAt || '', t.startedAt || '', t.completedAt || ''
-        ];
-        csv += row.join(',') + '\n';
+        csv += cols.map(c => csvCell(cellOf(t, c))).join(',') + '\n';
     });
     return csv;
 }
@@ -640,13 +691,32 @@ function toTXT(todos) {
         if (t.status === 'in-progress') txt += `（完成度 ${clampProgress(t.progress)}%）`;
         txt += '\n';
         txt += `   日期: ${t.date || ''}${t.dueTime ? ' ' + t.dueTime : ''}\n`;
+        if (t.startDate) txt += `   开始日期: ${t.startDate}\n`;
         txt += `   优先级: ${PRIORITY_MAP[t.priority] || t.priority}\n`;
         if (t.tags && t.tags.length) txt += `   标签: ${t.tags.join(', ')}\n`;
         if (t.note) txt += `   备注: ${t.note}\n`;
+        if (t.subtasks && t.subtasks.length) {
+            txt += `   子任务: ${t.subtasks.map(s => `${s.done ? '[√]' : '[ ]'}${s.text}`).join(' / ')}\n`;
+        }
+        if (t.createdAt) txt += `   创建时间: ${fmtMoment(t.createdAt)}\n`;
+        if (t.startedAt) txt += `   开始时间: ${fmtMoment(t.startedAt)}\n`;
+        if (t.completedAt) txt += `   完成时间: ${fmtMoment(t.completedAt)}\n`;
+        if (t.repeat && t.repeat.type && t.repeat.type !== 'none') txt += `   重复: ${REPEAT_MAP[t.repeat.type] || t.repeat.type}${t.repeat.type === 'custom' ? ' / 每 ' + (t.repeat.interval || 1) + ' 天' : ''}\n`;
+        if (t.archived) txt += '   已归档\n';
         txt += `${'-'.repeat(50)}\n`;
     });
     return txt;
 }
+
+// ISO 时间 → 本地「YYYY-MM-DD HH:mm」
+function fmtMoment(v) {
+    if (!v) return '';
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return String(v);
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+const REPEAT_MAP = { none: '不重复', daily: '每日', weekly: '每周', monthly: '每月', custom: '自定义天数' };
 
 function toMarkdown(todos) {
     let md = `# 待办事项列表\n\n> 导出时间：${new Date().toLocaleString()}　总数：${todos.length}\n\n`;
@@ -673,6 +743,11 @@ function toMarkdown(todos) {
                     md += `  - ${s.done ? '[x]' : '[ ]'} ${s.text}\n`;
                 });
             }
+            const stamps = [];
+            if (t.createdAt) stamps.push(`创建 ${fmtMoment(t.createdAt)}`);
+            if (t.startedAt) stamps.push(`开始 ${fmtMoment(t.startedAt)}`);
+            if (t.completedAt) stamps.push(`完成 ${fmtMoment(t.completedAt)}`);
+            if (stamps.length) md += `  <sub>${stamps.join('　')}</sub>\n`;
         });
         md += '\n';
     });
@@ -716,11 +791,47 @@ function clampProgress(v) {
     return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0;
 }
 
+// 「true/false/1/0/是/否」都能吃
+function toBool(v, dflt = false) {
+    if (typeof v === 'boolean') return v;
+    if (v === undefined || v === null || v === '') return dflt;
+    return /^(true|1|yes|y|是|已归档|置顶)$/i.test(String(v).trim());
+}
+
+// 重复周期：支持 "daily"、"daily:2"、{"type":"daily","interval":2} 三种写法
+function normalizeRepeat(v) {
+    if (!v) return { type: 'none', interval: 1 };
+    if (typeof v === 'object') {
+        const type = ['none', 'daily', 'weekly', 'monthly', 'custom'].includes(v.type) ? v.type : 'none';
+        return { type, interval: Math.max(1, parseInt(v.interval) || 1) };
+    }
+    const s = String(v).trim();
+    if (s.startsWith('{')) {
+        try { return normalizeRepeat(JSON.parse(s)); } catch { return { type: 'none', interval: 1 }; }
+    }
+    const [type, interval] = s.split(/[:/|]/);
+    const t = ['none', 'daily', 'weekly', 'monthly', 'custom'].includes(type) ? type : 'none';
+    return { type: t, interval: Math.max(1, parseInt(interval) || 1) };
+}
+
 function normalizeTodo(t) {
     if (!t || !t.content) return null;
     let tags = t.tags;
     if (typeof tags === 'string') tags = tags.split(/[|,]/).map(s => s.trim()).filter(Boolean);
     if (!Array.isArray(tags)) tags = [];
+    let subtasks = t.subtasks;
+    if (typeof subtasks === 'string') {
+        const s = subtasks.trim();
+        if (!s) subtasks = [];
+        else if (s.startsWith('[')) { try { subtasks = JSON.parse(s); } catch { subtasks = []; } }
+        else subtasks = s.split(/[|;]/).map(x => ({ text: x.trim(), done: false })).filter(x => x.text);
+    }
+    if (!Array.isArray(subtasks)) subtasks = [];
+    subtasks = subtasks.map(s => ({
+        id: s.id ? String(s.id) : (Date.now().toString(36) + Math.random().toString(36).slice(2, 8)),
+        text: String(s.text || '').trim(),
+        done: toBool(s.done)
+    })).filter(s => s.text);
     const status = ['pending', 'in-progress', 'completed'].includes(t.status) ? t.status : 'pending';
     return {
         id: t.id ? String(t.id) : (Date.now().toString() + Math.random().toString(36).slice(2, 8)),
@@ -734,8 +845,11 @@ function normalizeTodo(t) {
         status,
         progress: status === 'completed' ? 100 : clampProgress(t.progress),
         tags,
-        subtasks: Array.isArray(t.subtasks) ? t.subtasks : [],
-        pinned: !!t.pinned,
+        subtasks,
+        pinned: toBool(t.pinned),
+        archived: toBool(t.archived),
+        repeat: normalizeRepeat(t.repeat),
+        order: Number.isFinite(parseInt(t.order)) ? parseInt(t.order) : 0,
         createdAt: t.createdAt || new Date().toISOString(),
         startedAt: t.startedAt || null,
         completedAt: t.completedAt || null,
@@ -744,13 +858,15 @@ function normalizeTodo(t) {
 }
 
 function parseCSV(content) {
+    // 去掉 Excel 导出带的 BOM，否则首列表头会变成「\uFEFFcontent」
+    const text = String(content).replace(/^\uFEFF/, '');
     // 完整 CSV 解析：支持引号包裹的字段内含逗号、换行（备注多行不再损坏）
     const rows = [];
     let row = [], cur = '', inQuotes = false;
-    for (let i = 0; i < content.length; i++) {
-        const c = content[i];
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i];
         if (inQuotes) {
-            if (c === '"') { if (content[i + 1] === '"') { cur += '"'; i++; } else inQuotes = false; }
+            if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else inQuotes = false; }
             else cur += c;
         } else {
             if (c === '"') inQuotes = true;

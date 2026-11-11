@@ -161,16 +161,7 @@
                             <option value="md">Markdown</option>
                         </select>
                     </div>
-                    <div class="chip-select">
-                        <label>导出</label>
-                        <select id="export-select">
-                            <option value="">选择格式</option>
-                            <option value="json">JSON</option>
-                            <option value="csv">CSV</option>
-                            <option value="txt">TXT</option>
-                            <option value="md">Markdown</option>
-                        </select>
-                    </div>
+                    <button class="btn btn-ghost" id="open-export"><svg class="icon"><use href="#i-download"/></svg> 导出</button>
                 </div>
 
                 <!-- 高级筛选面板 -->
@@ -350,6 +341,17 @@
                     </div>
                     <div class="form-hint">仅「在办」任务在列表中显示进度条；标记结办时自动记为 100%。</div>
                 </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">创建时间</label>
+                        <input type="datetime-local" id="f-created" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">完成时间</label>
+                        <input type="datetime-local" id="f-completed" class="form-control">
+                    </div>
+                </div>
+                <div class="form-hint" style="margin:-8px 0 14px;">可手动校正记录时间（如补录历史任务）；完成时间会影响日报归属日期。</div>
                 <div class="form-group">
                     <label class="form-label">重复周期</label>
                     <select id="f-repeat" class="form-control">
@@ -422,6 +424,50 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" data-close="list-modal">取消</button>
                 <button class="btn btn-primary" id="save-list">创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 导出配置模态框 -->
+    <div id="export-modal" class="modal">
+        <div class="modal-content wide">
+            <div class="modal-header">
+                <h3><svg class="icon"><use href="#i-download"/></svg> 导出任务</h3>
+                <button class="close-btn" data-close="export-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">导出范围</label>
+                    <div class="conflict-options" style="margin:4px 0 0;">
+                        <label><input type="radio" name="export-scope" value="visible" checked> 当前筛选结果（<b id="export-visible-count">0</b> 条）</label>
+                        <label><input type="radio" name="export-scope" value="all"> 全部任务（<b id="export-all-count">0</b> 条）</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">文件格式</label>
+                    <div class="conflict-options" style="margin:4px 0 0;">
+                        <label><input type="radio" name="export-format" value="csv" checked> CSV（表格）</label>
+                        <label><input type="radio" name="export-format" value="json"> JSON</label>
+                        <label><input type="radio" name="export-format" value="txt"> TXT</label>
+                        <label><input type="radio" name="export-format" value="md"> Markdown</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="export-col-head">
+                        <label class="form-label" style="margin:0;">导出字段 <span id="export-col-count" class="export-col-count">20/20</span></label>
+                        <div class="export-col-actions">
+                            <button type="button" class="btn btn-ghost btn-sm" id="export-col-all">全选</button>
+                            <button type="button" class="btn btn-ghost btn-sm" id="export-col-none">清空</button>
+                            <button type="button" class="btn btn-ghost btn-sm" id="export-col-reset">恢复默认</button>
+                        </div>
+                    </div>
+                    <div class="export-cols" id="export-cols"></div>
+                    <div class="form-hint" id="export-hint">CSV 前 14 列与导入模板完全一致，导出的文件可以原样再导入；「任务内容」为必选列。</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-close="export-modal">取消</button>
+                <button class="btn btn-primary" id="confirm-export">导出</button>
             </div>
         </div>
     </div>

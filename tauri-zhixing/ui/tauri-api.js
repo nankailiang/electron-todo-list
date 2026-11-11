@@ -56,7 +56,7 @@
         backupNow: () => invoke('backup_now'),
 
         // 导入导出
-        exportTodos: (payload) => invoke('export_todos', { format: payload.format, todos: payload.todos }),
+        exportTodos: (payload) => invoke('export_todos', { format: payload.format, todos: payload.todos, columns: payload.columns || null }),
         parseImport: (payload) => invoke('parse_import', { filePath: payload.filePath, format: payload.format }),
         showOpenDialog: () => pick(),
 

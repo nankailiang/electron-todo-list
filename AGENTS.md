@@ -91,7 +91,7 @@ backups/          # 每日备份 todo-backup-YYYY-MM-DD.json，保留 7 天（�
 ---
 
 ## 7. 已实现功能清单
-多清单(颜色) · 列表/看板(拖拽改状态)/日历(月+周时间块拖拽) · 仪表盘图表(优先/趋势/柱/标签/效率) · 日报(生成/编辑/导出，纯文本工作日志 / Markdown 汇总两种格式) · 标签 · 子任务 · 在办任务完成度百分比(进度条/滑块/预设) · 重复(日/周/月/自定义) · 到期提醒+每日提醒(系统通知) · 搜索(含拼音首字母)+高级筛选+保存筛选 · 批量操作 · 导入导出(json/csv/txt/md) · 数据加密 · 备份/恢复(每日+手动) · 单实例锁 · 命令面板+快捷录入(全局快捷键) · 一键自动排程 · 开始/截止双日期 · 深浅色主题 · 紧凑模式 · 列表手动拖拽排序(仅 sort=manual 且非多选时) · 双击任务卡片编辑。
+多清单(颜色) · 列表/看板(拖拽改状态)/日历(月+周时间块拖拽) · 仪表盘图表(优先/趋势/柱/标签/效率) · 日报(生成/编辑/导出，纯文本工作日志 / Markdown 汇总两种格式) · 标签 · 子任务 · 在办任务完成度百分比(进度条/滑块/预设) · 重复(日/周/月/自定义) · 到期提醒+每日提醒(系统通知) · 搜索(含拼音首字母)+高级筛选+保存筛选 · 批量操作 · 导入导出(json/csv/txt/md，导出可选范围与字段列，CSV 表头与导入模板一致可直接回导) · 创建/完成时间可手改 · 数据加密 · 备份/恢复(每日+手动) · 单实例锁 · 命令面板+快捷录入(全局快捷键) · 一键自动排程 · 开始/截止双日期 · 深浅色主题 · 紧凑模式 · 列表手动拖拽排序(仅 sort=manual 且非多选时) · 双击任务卡片编辑。
 
 ---
 
@@ -166,8 +166,14 @@ backups/          # 每日备份 todo-backup-YYYY-MM-DD.json，保留 7 天（�
 ## 12.2 日报生成格式（plain / markdown）
 - `main.js buildReportSummary()` 与 Rust `build_report_summary()` 必须保持一致，改一处就要改另一处。
 - 默认 `plain`：抬头 `{reportAuthor} 工作日志`，逐条 `（N）{content} {尾巴}`；尾巴规则：结办 `完成`、在办 `{progress}%`（截止日晚于当天补 ` 预计YYYYMMDD完成`）、待办 `未开始`。
-- 顺序：完成 → 在办 → 待办。**在办任务的纳入条件是「当天已开始」（`startDate||startedAt||createdAt` ≤ 报告日），不看截止日是否等于当天**——否则截止日在未来的在办任务永远进不了日志。
+- 顺序：完成 → 在办 → 待办。**完成项内部按「完成时间」升序**（`completedAt||updatedAt||date T23:59`，同刻保持原顺序），在办按开始时间、待办按截止日期。**在办任务的纳入条件是「当天已开始」（`startDate||startedAt||createdAt` ≤ 报告日），不看截止日是否等于当天**——否则截止日在未来的在办任务永远进不了日志。
 - 导出：plain 模式落 `.txt` 且正文原样输出（正文自带抬头，不再套 Markdown 标题）；markdown 模式落 `.md`，正文已以 `# ` 开头时不重复加 H1。
+
+## 12.3 任务导出字段与「导出→再导入」闭环
+- 列定义在 `app.js EXPORT_COLUMNS`（20 列，前 14 列与 `tools/templates/tasks.csv` 表头顺序完全一致，后面追加 `id,repeat,subtasks,pinned,order,updatedAt`）；`main.js CSV_COLUMN_ORDER` 与 Rust `CSV_COLUMN_ORDER` 必须同步。
+- 导出弹窗：范围（当前筛选/全部）× 格式（csv/json/txt/md）× 字段勾选（默认全部，`content` 锁定必选，选择记在 `settings.exportColumns`）。TXT/MD 忽略列选择，固定输出全部字段。
+- 归一化必须能吃回自己导出的内容：`normalizeTodo` / `normalize_todo` 支持 `archived/pinned` 的 `true|false|1|0|是`、`repeat` 的 JSON 或 `daily:2`、`subtasks` 的 JSON 数组或 `a|b` 字符串、`order` 数字。CSV 带 UTF-8 BOM，解析前先 strip，否则首列表头会变成 `\uFEFFcontent`。
+- 时间字段：任务弹窗可改「创建时间 / 完成时间」（`datetime-local`），`isoToLocalInput` / `localInputToIso` 做 ISO(UTC) ↔ 本地互转，落库仍是 ISO 字符串。
 
 ---
 

@@ -211,7 +211,19 @@ fn build_report_summary(todos: &Value, date: &str, author: &str, style: &str) ->
         .iter()
         .filter(|t| !archived(t) && (s_or(t, "date", "") == date || s_or(t, "startDate", "") == date))
         .collect();
-    let completed: Vec<&Value> = scope
+    // 完成的按完成时间从早到晚排：先完成的写在日报前面的条目
+    let done_at = |t: &Value| -> String {
+        let c = s_or(t, "completedAt", "");
+        if !c.is_empty() {
+            return c;
+        }
+        let u = s_or(t, "updatedAt", "");
+        if !u.is_empty() {
+            return u;
+        }
+        format!("{}T23:59", s_or(t, "date", ""))
+    };
+    let mut completed: Vec<&Value> = scope
         .iter()
         .filter(|t| {
             if archived(t) {
@@ -222,8 +234,10 @@ fn build_report_summary(todos: &Value, date: &str, author: &str, style: &str) ->
             done_day == date || (st == "completed" && (s_or(t, "date", "") == date || s_or(t, "startDate", "") == date))
         })
         .collect();
+    // 完成的按完成时间从早到晚排，先完成的写在前面（同刻保持原顺序，sort_by 稳定）
+    completed.sort_by(|a, b| done_at(a).cmp(&done_at(b)));
     // 在办：截止日可以在未来，只要当天已经开始就算「今天在干这件事」
-    let in_progress: Vec<&Value> = scope
+    let mut in_progress: Vec<&Value> = scope
         .iter()
         .filter(|t| {
             !archived(t)
@@ -234,7 +248,13 @@ fn build_report_summary(todos: &Value, date: &str, author: &str, style: &str) ->
                 }
         })
         .collect();
-    let pending: Vec<&Value> = due.iter().filter(|t| s_or(t, "status", "") == "pending").cloned().collect();
+    in_progress.sort_by(|a, b| started_on(a).cmp(&started_on(b)).then_with(|| s_or(a, "date", "").cmp(&s_or(b, "date", ""))));
+    let mut pending: Vec<&Value> = due.iter().filter(|t| s_or(t, "status", "") == "pending").cloned().collect();
+    pending.sort_by(|a, b| {
+        s_or(a, "date", "")
+            .cmp(&s_or(b, "date", ""))
+            .then_with(|| s_or(a, "dueTime", "").cmp(&s_or(b, "dueTime", "")))
+    });
     let overdue: Vec<&Value> = scope
         .iter()
         .filter(|t| {
@@ -351,42 +371,123 @@ fn build_report_summary(todos: &Value, date: &str, author: &str, style: &str) ->
 // ---------------------------------------------------------------------------
 // 导入解析 / 导出序列化
 // ---------------------------------------------------------------------------
-fn csv_escape(s: &str) -> String {
-    format!("\"{}\"", s.replace('"', "\"\""))
+/// ISO 时间 → 本地「YYYY-MM-DD HH:mm」，解析不了就原样返回
+fn fmt_moment(v: &str) -> String {
+    match chrono::DateTime::parse_from_rfc3339(v) {
+        Ok(d) => d.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M").to_string(),
+        Err(_) => v.to_string(),
+    }
 }
-fn to_csv(todos: &Vec<Value>) -> String {
-    let headers = [
-        "id", "listId", "startDate", "date", "dueTime", "priority", "content", "note", "status",
-        "progress", "tags", "createdAt", "startedAt", "completedAt",
-    ];
-    let mut out = String::from(headers.join(","));
-    out.push('\n');
-    for t in todos {
-        let tags = t
+
+/// CSV 列顺序：前 14 列与导入模板 tools/templates/tasks.csv 一致，导出文件可直接再导入
+const CSV_COLUMN_ORDER: [&str; 20] = [
+    "content", "date", "startDate", "dueTime", "priority", "status", "progress", "tags", "note",
+    "listId", "createdAt", "startedAt", "completedAt", "archived", "id", "repeat", "subtasks",
+    "pinned", "order", "updatedAt",
+];
+
+fn pick_columns(columns: Option<Vec<String>>) -> Vec<String> {
+    match columns {
+        Some(v) if !v.is_empty() => {
+            let mut out: Vec<String> = CSV_COLUMN_ORDER
+                .iter()
+                .filter(|k| v.iter().any(|x| x == *k))
+                .map(|k| k.to_string())
+                .collect();
+            if !out.iter().any(|k| k == "content") {
+                out.insert(0, "content".into());
+            }
+            out
+        }
+        _ => CSV_COLUMN_ORDER.iter().map(|k| k.to_string()).collect(),
+    }
+}
+
+fn csv_cell(s: &str) -> String {
+    if s.contains(',') || s.contains('"') || s.contains('\n') || s.contains('\r') {
+        format!("\"{}\"", s.replace('"', "\"\""))
+    } else {
+        s.to_string()
+    }
+}
+
+/// 单列取值：统一成「可读 + 可再导入」的字符串
+fn csv_value(t: &Value, key: &str) -> String {
+    match key {
+        "progress" => {
+            if s_or(t, "status", "") == "completed" {
+                "100".into()
+            } else {
+                progress_of(t).to_string()
+            }
+        }
+        "tags" => t
             .get("tags")
             .and_then(|v| v.as_array())
             .map(|a| a.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join("|"))
-            .unwrap_or_default();
-        let row = vec![
-            s_or(t, "id", ""),
-            s_or(t, "listId", ""),
-            s_or(t, "startDate", ""),
-            s_or(t, "date", ""),
-            s_or(t, "dueTime", ""),
-            s_or(t, "priority", ""),
-            csv_escape(&s_or(t, "content", "")),
-            csv_escape(&s_or(t, "note", "")),
-            s_or(t, "status", ""),
-            progress_of(t).to_string(),
-            csv_escape(&tags),
-            s_or(t, "createdAt", ""),
-            s_or(t, "startedAt", ""),
-            s_or(t, "completedAt", ""),
-        ];
+            .unwrap_or_default(),
+        "archived" | "pinned" => {
+            if t.get(key).and_then(|v| v.as_bool()).unwrap_or(false) {
+                "true".into()
+            } else {
+                "false".into()
+            }
+        }
+        "repeat" => match t.get("repeat") {
+            Some(r) => {
+                let ty = r.get("type").and_then(|v| v.as_str()).unwrap_or("none");
+                if ty.is_empty() || ty == "none" {
+                    String::new()
+                } else {
+                    serde_json::to_string(r).unwrap_or_default()
+                }
+            }
+            None => String::new(),
+        },
+        "subtasks" => match t.get("subtasks").and_then(|v| v.as_array()) {
+            Some(a) if !a.is_empty() => serde_json::to_string(a).unwrap_or_default(),
+            _ => String::new(),
+        },
+        "order" => t
+            .get("order")
+            .and_then(|v| v.as_i64())
+            .map(|n| n.to_string())
+            .unwrap_or_default(),
+        _ => match t.get(key) {
+            Some(Value::String(s)) => s.clone(),
+            Some(Value::Null) | None => String::new(),
+            Some(v) => v.to_string(),
+        },
+    }
+}
+
+fn to_csv(todos: &Vec<Value>, cols: &[String]) -> String {
+    // BOM 让 Excel 打开中文不乱码；导入解析时会去掉
+    let mut out = String::from("\u{feff}");
+    out.push_str(&cols.join(","));
+    out.push('\n');
+    for t in todos {
+        let row: Vec<String> = cols.iter().map(|c| csv_cell(&csv_value(t, c))).collect();
         out.push_str(&row.join(","));
         out.push('\n');
     }
     out
+}
+
+/// JSON 导出按勾选的列裁剪
+fn project_todo(t: &Value, cols: &[String]) -> Value {
+    let mut m = serde_json::Map::new();
+    for c in cols {
+        let v = match c.as_str() {
+            "progress" => json!(if s_or(t, "status", "") == "completed" { 100 } else { progress_of(t) }),
+            "tags" => t.get("tags").cloned().unwrap_or(json!([])),
+            "subtasks" => t.get("subtasks").cloned().unwrap_or(json!([])),
+            "archived" | "pinned" => json!(t.get(c).and_then(|v| v.as_bool()).unwrap_or(false)),
+            _ => t.get(c).cloned().unwrap_or(Value::Null),
+        };
+        m.insert(c.clone(), v);
+    }
+    Value::Object(m)
 }
 fn status_cn(s: &str) -> &str {
     match s {
@@ -433,6 +534,22 @@ fn to_txt(todos: &Vec<Value>) -> String {
             }
         }));
         out.push_str(&format!("   优先级: {}\n", pr_cn(&s_or(t, "priority", ""))));
+        if let Some(tags) = t.get("tags").and_then(|v| v.as_array()) {
+            let ts: Vec<&str> = tags.iter().filter_map(|x| x.as_str()).collect();
+            if !ts.is_empty() {
+                out.push_str(&format!("   标签: {}\n", ts.join(", ")));
+            }
+        }
+        let note = s_or(t, "note", "");
+        if !note.is_empty() {
+            out.push_str(&format!("   备注: {}\n", note));
+        }
+        for (key, label) in [("createdAt", "创建时间"), ("startedAt", "开始时间"), ("completedAt", "完成时间")] {
+            let v = s_or(t, key, "");
+            if !v.is_empty() {
+                out.push_str(&format!("   {}: {}\n", label, fmt_moment(&v)));
+            }
+        }
         out.push_str(&format!("{}\n", "-".repeat(50)));
     }
     out
@@ -510,6 +627,71 @@ fn normalize_todo(t: &Value) -> Option<Value> {
         let d = s_or(t, "date", "");
         if d.is_empty() { chrono::Local::now().format("%Y-%m-%d").to_string() } else { d }
     };
+    // 「true/false/1/0/是/否」都能吃
+    let flag = |k: &str| -> bool {
+        match t.get(k) {
+            Some(Value::Bool(b)) => *b,
+            Some(Value::Number(n)) => n.as_i64().map(|x| x != 0).unwrap_or(false),
+            Some(Value::String(s)) => matches!(s.trim().to_lowercase().as_str(), "true" | "1" | "yes" | "y" | "是" | "已归档" | "置顶"),
+            _ => false,
+        }
+    };
+    // 子任务：数组直接用；字符串按 JSON 或「a|b」拆
+    let subtasks: Value = match t.get("subtasks") {
+        Some(Value::Array(a)) => {
+            let mut out: Vec<Value> = vec![];
+            for (i, s) in a.iter().enumerate() {
+                let text = s_or(s, "text", "");
+                if text.trim().is_empty() {
+                    continue;
+                }
+                let raw_id = s_or(s, "id", "");
+                let sid = if raw_id.trim().is_empty() {
+                    format!("{}{}{}", chrono::Utc::now().timestamp_millis(), rand::random::<u16>(), i)
+                } else {
+                    raw_id
+                };
+                out.push(json!({
+                    "id": sid,
+                    "text": text.trim(),
+                    "done": s.get("done").and_then(|v| v.as_bool()).unwrap_or(false)
+                }));
+            }
+            Value::Array(out)
+        }
+        Some(Value::String(s)) if !s.trim().is_empty() => {
+            if s.trim_start().starts_with('[') {
+                serde_json::from_str::<Value>(s).unwrap_or(json!([]))
+            } else {
+                Value::Array(
+                    s.split(|c| c == '|' || c == ';')
+                        .map(|x| x.trim())
+                        .filter(|x| !x.is_empty())
+                        .map(|x| json!({"text": x, "done": false}))
+                        .collect(),
+                )
+            }
+        }
+        _ => json!([]),
+    };
+    // 重复周期：支持 JSON / "daily" / "daily:2"
+    let repeat: Value = match t.get("repeat") {
+        Some(Value::Object(_)) => t.get("repeat").cloned().unwrap(),
+        Some(Value::String(s)) if !s.trim().is_empty() => {
+            let s = s.trim();
+            if s.starts_with('{') {
+                serde_json::from_str::<Value>(s).unwrap_or(json!({"type": "none", "interval": 1}))
+            } else {
+                let mut it = s.splitn(2, |c| c == ':' || c == '/' || c == '|');
+                let ty = it.next().unwrap_or("none").trim();
+                let style = if ["none", "daily", "weekly", "monthly", "custom"].contains(&ty) { ty } else { "none" };
+                let interval = it.next().and_then(|x| x.trim().parse::<i64>().ok()).unwrap_or(1).max(1);
+                json!({"type": style, "interval": interval})
+            }
+        }
+        _ => json!({"type": "none", "interval": 1}),
+    };
+    let order = t.get("order").and_then(|v| v.as_i64()).unwrap_or(0);
     Some(json!({
         "id": id,
         "listId": s_or(t, "listId", "default"),
@@ -522,8 +704,11 @@ fn normalize_todo(t: &Value) -> Option<Value> {
         "status": status,
         "progress": progress,
         "tags": tags,
-        "subtasks": t.get("subtasks").cloned().unwrap_or(json!([])),
-        "pinned": t.get("pinned").and_then(|v|v.as_bool()).unwrap_or(false),
+        "subtasks": subtasks,
+        "pinned": flag("pinned"),
+        "archived": flag("archived"),
+        "repeat": repeat,
+        "order": order,
         "createdAt": s_or(t, "createdAt", &now),
         "startedAt": t.get("startedAt").cloned().unwrap_or(Value::Null),
         "completedAt": t.get("completedAt").cloned().unwrap_or(Value::Null),
@@ -532,6 +717,8 @@ fn normalize_todo(t: &Value) -> Option<Value> {
 }
 
 fn parse_csv(content: &str) -> Vec<Value> {
+    // 去掉 Excel 导出带的 BOM，否则首列表头会变成 "\u{feff}content"
+    let content = content.trim_start_matches('\u{feff}');
     let mut rows: Vec<Vec<String>> = vec![];
     let mut row: Vec<String> = vec![];
     let mut cur = String::new();
@@ -906,19 +1093,23 @@ fn save_dialog(app: &AppHandle, default_name: &str, ext: &str) -> Option<PathBuf
 }
 
 #[tauri::command]
-fn export_todos(app: AppHandle, format: String, todos: Value) -> Value {
+fn export_todos(app: AppHandle, format: String, todos: Value, columns: Option<Vec<String>>) -> Value {
     let list = arr(&todos);
     if list.is_empty() {
         return json!({"success": false, "error": "没有可导出的任务"});
     }
-    let default = format!("todo-export-{}.{}", chrono::Local::now().format("%Y%m%d-%H%M%S"), format);
+    let cols = pick_columns(columns);
+    let default = format!("知行-任务-{}.{}", chrono::Local::now().format("%Y%m%d-%H%M%S"), format);
     let path = match save_dialog(&app, &default, &format) {
         Some(p) => p,
         None => return json!({"success": false, "error": "导出已取消"}),
     };
     let content = match format.as_str() {
-        "json" => serde_json::to_string_pretty(&todos).unwrap_or_default(),
-        "csv" => to_csv(&list),
+        "json" => {
+            let projected: Vec<Value> = list.iter().map(|t| project_todo(t, &cols)).collect();
+            serde_json::to_string_pretty(&projected).unwrap_or_default()
+        }
+        "csv" => to_csv(&list, &cols),
         "txt" => to_txt(&list),
         "md" => to_markdown(&list),
         _ => return json!({"success": false, "error": "不支持的格式"}),
