@@ -1002,6 +1002,12 @@ function bulkApply(fn, msg) {
 // ---------------------------------------------------------------------------
 // 任务模态框（新建 / 编辑，含子任务、备注、重复、智能识别）
 // ---------------------------------------------------------------------------
+// 打开弹窗时的初始标签：保存时用来判断用户主动删掉了哪些，
+// 被删掉的标签不允许被「按内容自动打标签」再补回来
+let modalInitialTags = [];
+// 标签框是否被手动编辑过（含新建时删掉自动打出的标签）
+let tagFieldDirty = false;
+
 function openTaskModal(task) {
     const isEdit = !!task;
     $('task-modal-title').textContent = isEdit ? '编辑任务' : '新建任务';
@@ -1013,6 +1019,8 @@ function openTaskModal(task) {
     $('f-start').value = isEdit ? (task.startDate || '') : '';
     $('f-time').value = isEdit ? (task.dueTime || '') : '';
     $('f-tags').value = isEdit ? (task.tags || []).join(', ') : '';
+    modalInitialTags = isEdit ? (task.tags || []).slice() : [];
+    tagFieldDirty = false;
     $('f-repeat').value = isEdit ? (task.repeat ? task.repeat.type : 'none') : 'none';
     $('f-repeat-interval').value = isEdit && task.repeat ? (task.repeat.interval || 3) : 3;
     $('f-repeat-interval').classList.toggle('hidden', $('f-repeat').value !== 'custom');
@@ -1109,9 +1117,13 @@ function saveTaskFromModal() {
     if (!content) { showNotification('请输入任务内容', 'warning'); return; }
     const id = $('task-id').value;
     const tags = $('f-tags').value.split(/[,，]/).map(s => s.trim()).filter(Boolean);
-    // 自动打标签：用已有标签识别内容，补上没写的
-    if (State.settings.autoTag !== false) {
-        suggestTags(content, allTags()).forEach(t => { if (!tags.includes(t)) tags.push(t); });
+    // 自动打标签：用已有标签识别内容，补上没写的。
+    // 但用户在弹窗里手动删掉的标签要尊重，不能再补回来——否则「删了保存」等于没删
+    const droppedTags = modalInitialTags.filter(t => !tags.includes(t));
+    if (State.settings.autoTag !== false && !tagFieldDirty) {
+        suggestTags(content, allTags()).forEach(t => {
+            if (!tags.includes(t) && !droppedTags.includes(t)) tags.push(t);
+        });
     }
     const repeatType = $('f-repeat').value;
     const subtasks = State.editingSubtasks.filter(s => s.text.trim()).map(s => ({ id: s.id || uid(), text: s.text.trim(), done: !!s.done }));
@@ -2422,6 +2434,8 @@ function bindEvents() {
     // 任务模态框内交互
     $('f-content').addEventListener('input', debounce((e) => { showSuggestions(e.target.value); renderTagSuggest(e.target.value); }, 150));
     $('f-content').addEventListener('blur', () => { smartParse(); setTimeout(() => $('content-suggest').classList.remove('show'), 150); });
+    // 标签框被手动改过就标记，保存时不再按内容自动补标签（否则刚删掉的会被补回来）
+    $('f-tags').addEventListener('input', () => { tagFieldDirty = true; });
     $('f-repeat').addEventListener('change', (e) => $('f-repeat-interval').classList.toggle('hidden', e.target.value !== 'custom'));
     $('add-subtask').addEventListener('click', () => { State.editingSubtasks.push({ id: uid(), text: '', done: false }); renderSubtaskEditor(); });
 
