@@ -236,12 +236,17 @@ button, input, select, textarea { font-family: inherit; }
 .chart-card h4 .icon { color: var(--primary); width: 1em; height: 1em; }
 .chart-card .chart-body { display: flex; align-items: center; justify-content: center; min-height: 180px; gap: 20px; flex-wrap: wrap; }
 
-/* 标签分布条形 */
-.tag-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.tag-bar-name { width: 96px; flex-shrink: 0; font-size: 0.82rem; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tag-bar-track { flex: 1; height: 10px; background: var(--surface-3); border-radius: 8px; overflow: hidden; }
-.tag-bar-fill { height: 100%; border-radius: 8px; transition: width 0.4s ease; }
-.tag-bar-num { font-size: 0.76rem; color: var(--text-3); width: 24px; text-align: right; font-weight: 500; }
+/* 标签分布：按数量排名的横向条形（长度等比、颜色递进） */
+#tag-chart.chart-body { display: block; width: 100%; }
+.tag-dist { display: flex; flex-direction: column; justify-content: center; gap: 7px; width: 100%; height: 100%; }
+.tag-dist-row { display: grid; grid-template-columns: 74px minmax(0, 1fr) 58px; align-items: center; gap: 10px; padding: 0 4px; border-radius: 7px; transition: background 0.15s ease; }
+.tag-dist-row:hover { background: var(--surface-2); }
+.tag-dist-name { font-size: 0.8rem; font-weight: 600; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tag-dist-track { height: 12px; background: var(--surface-3); border-radius: 7px; overflow: hidden; }
+.tag-dist-fill { display: block; height: 100%; background: var(--primary); border-radius: 7px; min-width: 6px; transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.45s ease; }
+.tag-dist-val { font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tag-dist-val i { margin-left: 4px; font-style: normal; font-size: 0.68rem; font-weight: 500; color: var(--text-3); }
+.tag-dist-foot { margin-top: 4px; font-size: 0.7rem; color: var(--text-3); text-align: right; }
 .pie-legend { display: flex; flex-direction: column; gap: 8px; font-size: 0.85rem; }
 .pie-legend .lg { display: flex; align-items: center; gap: 8px; color: var(--text-2); }
 .pie-legend .lg .sw { width: 12px; height: 12px; border-radius: 4px; }

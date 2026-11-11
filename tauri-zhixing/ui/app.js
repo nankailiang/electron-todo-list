@@ -1588,17 +1588,28 @@ function renderBar(scope) {
 function renderTags(active) {
     const map = {};
     active.forEach(t => (t.tags || []).forEach(tag => { map[tag] = (map[tag] || 0) + 1; }));
-    const entries = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    const all = Object.entries(map).sort((a, b) => b[1] - a[1]);
     const box = $('tag-chart');
-    if (!entries.length) { box.innerHTML = '<p style="font-size:0.82rem;color:var(--text-3);">暂无标签数据</p>'; return; }
-    const max = entries[0][1];
-    const palette = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)', '#F5A623', '#9B8AF5', '#B0B0BF'];
-    box.innerHTML = entries.map(([tag, n], i) => `
-        <div class="tag-bar-row">
-            <span class="tag-bar-name" title="${escapeHtml(tag)}">#${escapeHtml(tag)}</span>
-            <div class="tag-bar-track"><div class="tag-bar-fill" style="width:${Math.max(8, n / max * 100)}%;background:${palette[i % palette.length]}"></div></div>
-            <span class="tag-bar-num">${n}</span>
-        </div>`).join('');
+    if (!all.length) { box.innerHTML = '<p style="font-size:0.82rem;color:var(--text-3);">暂无标签数据</p>'; return; }
+    const top = all.slice(0, 8);
+    const max = top[0][1];
+    const marks = all.reduce((s, e) => s + e[1], 0);   // 全部标记次数
+    const rows = top.map(([tag, n]) => {
+        // 长度按最大值等比缩放，深浅随数量递进，一眼看出量级差
+        const pct = Math.max(4, n / max * 100);
+        const depth = 0.4 + 0.6 * (n / max);
+        const share = marks ? (n / marks * 100) : 0;
+        const shareText = share >= 1 ? `${Math.round(share)}%` : '<1%';
+        return `<div class="tag-dist-row" title="#${escapeHtml(tag)}：${n} 个任务，占全部标记的 ${shareText}">
+            <span class="tag-dist-name">#${escapeHtml(tag)}</span>
+            <span class="tag-dist-track"><span class="tag-dist-fill" style="width:${pct.toFixed(1)}%;opacity:${depth.toFixed(2)}"></span></span>
+            <span class="tag-dist-val">${n}<i>${shareText}</i></span>
+        </div>`;
+    }).join('');
+    const foot = all.length > top.length
+        ? `显示前 ${top.length} / 共 ${all.length} 个标签 · ${marks} 次标记`
+        : `共 ${all.length} 个标签 · ${marks} 次标记`;
+    box.innerHTML = `<div class="tag-dist">${rows}<div class="tag-dist-foot">${foot}</div></div>`;
 }
 
 function renderEfficiency(scope) {
