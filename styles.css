@@ -309,7 +309,17 @@ input[type="color"].form-control { padding: 3px; }
 .chip-select select { border: none; background: none; padding: 6px 4px; color: var(--text); font-size: 0.85rem; cursor: pointer; outline: none; font-weight: 500; }
 
 .filter-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 16px; box-shadow: var(--shadow); }
-.filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; align-items: end; }
+.filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; align-items: end; }
+/* 时间范围：两个日期输入并排 */
+.range-row { display: flex; align-items: center; gap: 6px; }
+.range-row .form-control { flex: 1; min-width: 0; }
+.range-sep { color: var(--text-3); font-size: 0.8rem; flex-shrink: 0; }
+/* 任务弹窗里按内容识别出的标签建议 */
+.tag-suggest { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.tag-suggest:empty { display: none; }
+.tag-suggest .ts-label { font-size: 0.76rem; color: var(--text-3); align-self: center; }
+.tag-suggest .ts-chip { display: inline-flex; align-items: center; gap: 3px; padding: 3px 9px; font-size: 0.76rem; border-radius: var(--radius-pill); border: 1px dashed var(--border-strong); color: var(--text-2); background: transparent; cursor: pointer; transition: all .15s; }
+.tag-suggest .ts-chip:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); border-style: solid; }
 .saved-filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
 .saved-filter-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--primary-soft); border: 1px solid transparent; border-radius: var(--radius-pill); padding: 5px 14px; font-size: 0.8rem; color: var(--primary); cursor: pointer; transition: all 0.2s; font-weight: 500; }
 .saved-filter-chip:hover { border-color: var(--primary); background: var(--primary); color: #fff; }

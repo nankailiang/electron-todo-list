@@ -362,7 +362,30 @@ function toTask({ flat, raw }, listIds, orderStart) {
         startedAt: status === 'in-progress' ? normTs(flat.startedat, baseDate, 10) : null,
         completedAt: status === 'completed' ? normTs(flat.completedat, baseDate, 18) : null,
         updatedAt: normTs(flat.updatedat, baseDate, 18),
+        progressLog: parseProgressLog(flat.progresslog, baseDate),
     };
+}
+
+/** 进度流水：「2026-10-21:20|2026-10-29:80」或 JSON 数组 */
+function parseProgressLog(v, baseDate) {
+    const s = String(v || '').trim();
+    if (!s) return [];
+    let entries = [];
+    if (s.startsWith('[')) {
+        try {
+            const a = JSON.parse(s);
+            entries = Array.isArray(a) ? a.map(e => ({ d: String(e.d || e.date || ''), p: Number(e.p ?? e.progress ?? 0) })) : [];
+        } catch { entries = []; }
+    } else {
+        entries = s.split(/[|;]/).map(pair => {
+            const [d, p] = pair.split(/[:：]/);
+            return { d: String(d || '').trim(), p: Number(p || 0) };
+        });
+    }
+    return entries
+        .filter(e => /^\d{4}-\d{2}-\d{2}$/.test(e.d))
+        .map(e => ({ d: e.d, p: Math.max(0, Math.min(100, Math.round(e.p) || 0)) }))
+        .sort((a, b) => a.d.localeCompare(b.d));
 }
 
 function toReport({ flat }) {

@@ -345,9 +345,29 @@ function buildReportSummary(todos, dateStr) {
             (t.completedAt && String(t.completedAt).slice(0, 10) === dateStr)
         ))
         .sort((a, b) => doneAt(a).localeCompare(doneAt(b)));
-    // 在办：截止日可能在未来，只要当天已经开始就算「今天在干这件事」
+    // 「当天进度有变化」才写进日志：一直挂着但没推进的在办任务不重复出现在每天的日志里
+    const progressDays = (t) => {
+        const log = Array.isArray(t.progressLog) ? t.progressLog : [];
+        const days = new Set();
+        let prev = -1;
+        for (const e of log.slice().sort((a, b) => String(a.d || '').localeCompare(String(b.d || '')))) {
+            const d = String(e.d || '').slice(0, 10);
+            const p = Number(e.p);
+            if (!d || !Number.isFinite(p) || p === prev) continue;
+            days.add(d);
+            prev = p;
+        }
+        return days;
+    };
+    // 在办：截止日可能在未来，只要当天已经开始就算「今天在干这件事」；
+    // 但只有当天进度真的动过（或有改动的痕迹）才写进日志
     const inProgress = scope
         .filter(t => !t.archived && t.status === 'in-progress' && (!startedOn(t) || startedOn(t) <= dateStr))
+        .filter(t => {
+            const days = progressDays(t);
+            if (days.size) return days.has(dateStr);
+            return startedOn(t) === dateStr || day(t) === dateStr;
+        })
         .sort((a, b) => startedOn(a).localeCompare(startedOn(b)) || String(a.date || '').localeCompare(String(b.date || '')));
     const pending = due
         .filter(t => t.status === 'pending')
@@ -364,13 +384,23 @@ function buildReportSummary(todos, dateStr) {
         }).join('\n') + '\n';
     };
 
+    // 历史进度：生成过去某天的日志时，用那天记下的完成度，而不是今天的值
+    const progressAt = (t) => {
+        const log = (Array.isArray(t.progressLog) ? t.progressLog : [])
+            .filter(e => String(e.d || '') <= dateStr)
+            .sort((a, b) => String(a.d || '').localeCompare(String(b.d || '')));
+        const last = log[log.length - 1];
+        return clampProgress(last ? last.p : t.progress);
+    };
+    const inProgressView = inProgress.map(t => Object.assign({}, t, { progress: progressAt(t) }));
+
     const { author, style } = reportOptions();
-    const plainItems = [...completed, ...inProgress, ...pending];
+    const plainItems = [...completed, ...inProgressView, ...pending];
     const defaultContent = style === 'plain'
         ? (plainItems.length ? plainLogBody(plainItems, dateStr, author) : (author ? `${author} 工作日志\n` : '工作日志\n'))
         : `# 工作日报（${dateStr}）\n\n` +
             lines(completed, '今日完成') +
-            lines(inProgress, '进行中', true) +
+            lines(inProgressView, '进行中', true) +
             lines(pending, '待处理') +
             lines(overdue, '逾期未完成') +
             '## 明日计划\n- \n';
@@ -381,10 +411,10 @@ function buildReportSummary(todos, dateStr) {
         author,
         style,
         total: plainItems.length,
-        counts: { completed: completed.length, inProgress: inProgress.length, pending: pending.length, overdue: overdue.length },
+        counts: { completed: completed.length, inProgress: inProgressView.length, pending: pending.length, overdue: overdue.length },
         items: {
             completed: completed.map(pick),
-            inProgress: inProgress.map(pick),
+            inProgress: inProgressView.map(pick),
             pending: pending.map(pick),
             overdue: overdue.map(pick)
         },
@@ -596,7 +626,8 @@ const PRIORITY_MAP = { high: '高', medium: '中', low: '低' };
 
 // CSV 表头顺序与导入模板 tools/templates/tasks.csv 完全一致，导出文件可直接再导入
 const CSV_COLUMN_ORDER = ['content', 'date', 'startDate', 'dueTime', 'priority', 'status', 'progress', 'tags', 'note',
-    'listId', 'createdAt', 'startedAt', 'completedAt', 'archived', 'id', 'repeat', 'subtasks', 'pinned', 'order', 'updatedAt'];
+    'listId', 'createdAt', 'startedAt', 'completedAt', 'archived', 'id', 'repeat', 'subtasks', 'pinned', 'order', 'updatedAt',
+    'progressLog'];
 
 /** 把列参数整理成稳定顺序（未知列忽略，content 必需） */
 function pickColumns(columns) {
@@ -617,6 +648,9 @@ function cellOf(t, key) {
         case 'repeat': return t.repeat && t.repeat.type && t.repeat.type !== 'none' ? JSON.stringify(t.repeat) : '';
         case 'subtasks': return (Array.isArray(t.subtasks) && t.subtasks.length) ? JSON.stringify(t.subtasks) : '';
         case 'order': return (t.order === undefined || t.order === null) ? '' : String(t.order);
+        case 'progressLog': return (Array.isArray(t.progressLog) && t.progressLog.length)
+            ? t.progressLog.map(e => `${e.d}:${clampProgress(e.p)}`).join('|')
+            : '';
         default: {
             const v = t[key];
             if (v === undefined || v === null) return '';
@@ -833,6 +867,23 @@ function normalizeTodo(t) {
         done: toBool(s.done)
     })).filter(s => s.text);
     const status = ['pending', 'in-progress', 'completed'].includes(t.status) ? t.status : 'pending';
+    // 进度流水：兼容 JSON（[{d,p}]）与紧凑写法（2026-10-21:20|2026-10-29:80）
+    let progressLog = t.progressLog;
+    if (typeof progressLog === 'string') {
+        const s = progressLog.trim();
+        if (!s) progressLog = [];
+        else if (s.startsWith('[')) { try { progressLog = JSON.parse(s); } catch { progressLog = []; } }
+        else progressLog = s.split(/[|;]/).map(pair => {
+            const [d, p] = pair.split(/[:：]/);
+            return { d: String(d || '').trim(), p: clampProgress(p) };
+        }).filter(e => /^\d{4}-\d{2}-\d{2}$/.test(e.d));
+    }
+    if (!Array.isArray(progressLog)) progressLog = [];
+    progressLog = progressLog.map(e => ({
+        d: String((e && (e.d || e.date)) || '').slice(0, 10),
+        p: clampProgress(e && (e.p !== undefined ? e.p : e.progress))
+    })).filter(e => /^\d{4}-\d{2}-\d{2}$/.test(e.d))
+        .sort((a, b) => a.d.localeCompare(b.d));
     return {
         id: t.id ? String(t.id) : (Date.now().toString() + Math.random().toString(36).slice(2, 8)),
         listId: t.listId || 'default',
@@ -844,6 +895,7 @@ function normalizeTodo(t) {
         note: t.note || '',
         status,
         progress: status === 'completed' ? 100 : clampProgress(t.progress),
+        progressLog,
         tags,
         subtasks,
         pinned: toBool(t.pinned),

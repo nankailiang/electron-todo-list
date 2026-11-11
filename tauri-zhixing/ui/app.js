@@ -27,11 +27,17 @@ const State = {
         showDashboard: false,
         reportAuthor: '',
         reportStyle: 'plain',
+        autoTag: true,
         exportColumns: null,
         exportFormat: 'csv',
         exportScope: 'visible'
     },
-    filters: { search: '', status: 'all', priority: 'all', tag: 'all', start: '', end: '', archived: false, hideUnstarted: false },
+    filters: {
+        search: '', status: 'all', priority: 'all', tag: '',
+        start: '', end: '',
+        createdFrom: '', createdTo: '', completedFrom: '', completedTo: '',
+        archived: false, hideUnstarted: false
+    },
     sort: { by: 'manual', dir: 'desc' },
     selectMode: false,
     selected: new Set(),
@@ -131,6 +137,18 @@ function clampProgress(v) {
     return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0;
 }
 function storedProgress(t) { return t ? clampProgress(t.progress) : 0; }
+// 进度流水：记录「哪天把完成度改成了多少」。日报据此判断当天有没有实际进展，
+// 一直挂着但当天没动过的在办任务不会重复出现在每天的日志里。
+function logProgressChange(t, pct, dayIso) {
+    if (!t) return;
+    const p = clampProgress(pct);
+    const d = dayIso || localISO();
+    if (!Array.isArray(t.progressLog)) t.progressLog = [];
+    const last = t.progressLog[t.progressLog.length - 1];
+    if (last && last.d === d) { last.p = p; return; }
+    t.progressLog.push({ d, p });
+    if (last && last.d > d) t.progressLog.sort((a, b) => String(a.d).localeCompare(String(b.d)));
+}
 function taskProgress(t) {
     if (!t) return 0;
     if (t.status === 'completed') return 100;
@@ -140,7 +158,11 @@ function taskProgress(t) {
 function dayNum(iso) { return parseInt(iso.slice(8, 10), 10); }
 function fmtMD(iso) { const p = iso.split('-'); return `${parseInt(p[1], 10)}月${parseInt(p[2], 10)}日`; }
 // 把 UTC 时间戳按其本地日期归日（用于完成时间统计分组）
-function tsDay(ts) { return ts ? localISO(new Date(ts)) : ''; }
+function tsDay(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    return isNaN(d.getTime()) ? '' : localISO(d);
+}
 
 function dueDateObj(t) {
     if (!t.date) return null;
@@ -253,6 +275,7 @@ function migrateData() {
         if (t.dueTime === undefined) { t.dueTime = ''; changed = true; }
         if (t.startDate === undefined) { t.startDate = ''; changed = true; }
         if (t.order === undefined) { t.order = 0; changed = true; }
+        if (!Array.isArray(t.progressLog)) { t.progressLog = []; changed = true; }
         // repeat 统一为 {type, interval}：兼容旧版字符串（如 "none"/"daily"）
         if (typeof t.repeat === 'string') {
             t.repeat = { type: t.repeat || 'none', interval: 1 }; changed = true;
@@ -324,6 +347,7 @@ function spawnRecurring(task) {
         recurPrevId: task.id,
         status: 'pending',
         progress: 0,
+        progressLog: [],
         pinned: task.pinned,
         subtasks: (task.subtasks || []).map(s => ({ ...s, done: false })),
         createdAt: new Date().toISOString(),
@@ -385,11 +409,29 @@ function getVisibleTodos() {
         if (f.status !== 'all' && t.status !== f.status) return false;
         // 优先级
         if (f.priority !== 'all' && t.priority !== f.priority) return false;
-        // 标签
-        if (f.tag !== 'all' && !(t.tags || []).includes(f.tag)) return false;
-        // 日期范围
+        // 标签：自由输入，逗号/空格分隔多个；每个词都要命中某个标签（不区分大小写，含即算）
+        const tagTerms = String(f.tag || '').split(/[,，\s]+/).map(s => s.trim().toLowerCase()).filter(t => t && t !== 'all');
+        if (tagTerms.length) {
+            const own = (t.tags || []).map(x => String(x).toLowerCase());
+            if (!tagTerms.every(term => own.some(tag => tag.includes(term)))) return false;
+        }
+        // 截止日期范围
         if (f.start && (!t.date || t.date < f.start)) return false;
         if (f.end && (!t.date || t.date > f.end)) return false;
+        // 创建时间范围（按本地日期比较）
+        if (f.createdFrom || f.createdTo) {
+            const cd = tsDay(t.createdAt);
+            if (!cd) return false;
+            if (f.createdFrom && cd < f.createdFrom) return false;
+            if (f.createdTo && cd > f.createdTo) return false;
+        }
+        // 完成时间范围：只筛已完成的（没完成时间的不参与）
+        if (f.completedFrom || f.completedTo) {
+            const dd = tsDay(t.completedAt);
+            if (!dd) return false;
+            if (f.completedFrom && dd < f.completedFrom) return false;
+            if (f.completedTo && dd > f.completedTo) return false;
+        }
         // 搜索（内容 / 标签 / 备注 / 拼音首字母）
         if (f.search) {
             const q = f.search.toLowerCase();
@@ -816,10 +858,11 @@ function setStatus(id, status) {
     if (status === 'completed') {
         t.completedAt = now;
         t.progress = 100;
+        logProgressChange(t, 100);
         if (!t.startedAt) t.startedAt = now;
         spawnRecurring(t);
     }
-    if (status === 'pending') { t.completedAt = null; t.progress = 0; }
+    if (status === 'pending') { t.completedAt = null; t.progress = 0; logProgressChange(t, 0); }
     t.status = status;
     t.updatedAt = now;
     saveTodos();
@@ -834,6 +877,7 @@ function setTaskProgress(id, pct, opts) {
     const next = clampProgress(pct);
     if (next === storedProgress(t)) return;
     t.progress = next;
+    logProgressChange(t, next);
     t.updatedAt = new Date().toISOString();
     saveTodos();
     if (!opts || !opts.silent) renderCurrentView();
@@ -855,6 +899,7 @@ function copyTask(t) {
         content: t.content + '（副本）',
         status: 'pending',
         progress: 0,
+        progressLog: [],
         pinned: false,
         subtasks: (t.subtasks || []).map(s => ({ ...s, id: uid(), done: false })),
         createdAt: new Date().toISOString(),
@@ -933,9 +978,27 @@ function openTaskModal(task) {
 
     State.editingSubtasks = isEdit ? structuredCloneSafe(task.subtasks || []) : [];
     renderSubtaskEditor();
+    renderTagSuggest($('f-content').value);
 
     openModal('task-modal');
     setTimeout(() => $('f-content').focus(), 100);
+}
+
+// 按内容识别已有标签，给出可点选的建议（不自动改输入框内容，避免覆盖手输）
+function renderTagSuggest(content) {
+    const box = $('tag-suggest');
+    if (!box) return;
+    const cur = $('f-tags').value.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+    const hits = suggestTags(content, allTags()).filter(t => !cur.includes(t));
+    if (!String(content || '').trim() || !hits.length) { box.innerHTML = ''; return; }
+    box.innerHTML = '<span class="ts-label">识别到</span>' +
+        hits.map(t => `<button type="button" class="ts-chip" data-tag="${escapeHtml(t)}">+ #${escapeHtml(t)}</button>`).join('');
+    box.querySelectorAll('.ts-chip').forEach(el => el.addEventListener('click', () => {
+        const tags = $('f-tags').value.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+        if (!tags.includes(el.dataset.tag)) tags.push(el.dataset.tag);
+        $('f-tags').value = tags.join(', ');
+        renderTagSuggest($('f-content').value);
+    }));
 }
 
 // 弹窗里的完成度控件：range / 数字 / 预设按钮三处保持同步
@@ -996,7 +1059,11 @@ function saveTaskFromModal() {
     const content = $('f-content').value.trim();
     if (!content) { showNotification('请输入任务内容', 'warning'); return; }
     const id = $('task-id').value;
-    const tags = $('f-tags').value.split(',').map(s => s.trim()).filter(Boolean);
+    const tags = $('f-tags').value.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+    // 自动打标签：用已有标签识别内容，补上没写的
+    if (State.settings.autoTag !== false) {
+        suggestTags(content, allTags()).forEach(t => { if (!tags.includes(t)) tags.push(t); });
+    }
     const repeatType = $('f-repeat').value;
     const subtasks = State.editingSubtasks.filter(s => s.text.trim()).map(s => ({ id: s.id || uid(), text: s.text.trim(), done: !!s.done }));
     const existing = id ? findTask(id) : null;
@@ -1022,19 +1089,26 @@ function saveTaskFromModal() {
 
     if (id) {
         const t = findTask(id);
+        const before = storedProgress(t);
         Object.assign(t, payload, { updatedAt: new Date().toISOString(), _promoted: false });
+        if (storedProgress(t) !== before) logProgressChange(t, storedProgress(t), tsDay(completedIso) || undefined);
         showNotification('任务已更新', 'success');
     } else {
         const now = new Date().toISOString();
         const maxOrder = Math.max(0, ...State.todos.map(t => t.order || 0));
-        State.todos.unshift({
+        const created = {
             id: uid(), ...payload,
             // 补录历史任务时直接填完成时间，则按已结办入库
             status: completedIso ? 'completed' : 'pending',
             progress: completedIso ? 100 : clampProgress($('f-progress-num').value),
             pinned: false, archived: false,
             order: maxOrder + 1, startedAt: null, updatedAt: now
-        });
+        };
+        // 建任务时带完成度/完成时间，说明今天确实推进过，记一条进度流水
+        if (completedIso || storedProgress(created) > 0) {
+            logProgressChange(created, storedProgress(created), tsDay(completedIso) || undefined);
+        }
+        State.todos.unshift(created);
         showNotification('任务添加成功', 'success');
     }
     saveTodos();
@@ -1515,17 +1589,59 @@ function renderEfficiency(scope) {
 // ---------------------------------------------------------------------------
 // 标签 / 保存的筛选
 // ---------------------------------------------------------------------------
+// 标签：业务域（最多 2 个）+ 事务类型（最多 1 个），按内容关键词识别
+// 顺序即优先级：越靠前越具体，先命中的先入选
+const TAG_RULES = [
+    { tag: '征信', kind: 'domain', keys: ['征信', '中征码', '报文', '借据', '漏保', '还款表现', '授信协议', '银行机构'] },
+    { tag: 'EAST', kind: 'domain', keys: ['east'] },
+    { tag: '债券', kind: 'domain', keys: ['债券'] },
+    { tag: '租后', kind: 'domain', keys: ['租后'] },
+    { tag: '绿金', kind: 'domain', keys: ['绿金', '绿色金融'] },
+    { tag: '项目审批', kind: 'domain', keys: ['项目评审', '审批', '批复', '评审', '项目变更', '委员', '流程改造', '审核', '互斥'] },
+    { tag: '资金', kind: 'domain', keys: ['资金', '授信', '计提', '还款', '租金', '调息', '银团', '结清', '保证金', '留购价款', '放款', '利率', '融资', '款项支付', '合同', '押品', '租息', '日均', '支付', '违约金', '退回'] },
+    { tag: '财务', kind: 'domain', keys: ['凭证', '对账', '核销', '入账', '摊销', '报销', '科目', '财务', '台账', '挂账', '呆账', '减值'] },
+    { tag: '权限', kind: 'domain', keys: ['权限', '账号', '角色', '人员', '用户', '组织架构', '岗位', '密码', '管户人'] },
+    { tag: '报表', kind: 'domain', keys: ['报表', '统计'] },
+    { tag: '安全漏洞', kind: 'type', keys: ['漏洞', '安全'] },
+    { tag: '发版运维', kind: 'type', keys: ['发版', '上线', '部署', '迁移', '备份', '恢复', '重启', '巡检', '环境'] },
+    { tag: '缺陷修复', kind: 'type', keys: ['问题排查', '问题修改', '问题处理', 'bug', '报错', '失败', '异常', '错误', '缺陷', '无法', '不显示', '不对', '不符'] },
+    { tag: '测试联调', kind: 'type', keys: ['测试', '联调', '验证', 'uat'] },
+    { tag: '数据处理', kind: 'type', keys: ['抽取', '补录', '数据修改', '数据处理', '数据核对', '数据对比', '数据初始化', '初始化', '台账', '替换', '上传'] },
+    { tag: '需求分析', kind: 'type', keys: ['讨论', '需求', '分析', '评估', '方案', '会议', '文档', '编写', '整理', '可行性', '评审会'] }
+];
+const TAG_POOL = TAG_RULES.map(r => r.tag);
+const TAG_KEY_MAP = TAG_RULES.reduce((m, r) => { m[r.tag] = r.keys; return m; }, {});
+
+/** 按内容识别标签；pool 为空时用内置规则表，否则只认已有标签（用户可自建） */
+function suggestTags(content, pool) {
+    const text = String(content || '').toLowerCase();
+    if (!text.trim()) return [];
+    const list = (pool && pool.length) ? pool : TAG_POOL;
+    const hit = [];
+    for (const tag of list) {
+        if (!tag || hit.includes(tag)) continue;
+        const keys = TAG_KEY_MAP[tag] || [];
+        if (text.includes(String(tag).toLowerCase()) || keys.some(k => text.includes(k))) hit.push(tag);
+    }
+    // 业务域最多 2 个、事务类型最多 1 个，其余丢弃，避免一条任务挂一堆标签
+    const domain = hit.filter(t => (TAG_RULES.find(r => r.tag === t) || {}).kind === 'domain').slice(0, 2);
+    const type = hit.filter(t => (TAG_RULES.find(r => r.tag === t) || {}).kind === 'type').slice(0, 1);
+    const other = hit.filter(t => !TAG_RULES.some(r => r.tag === t)).slice(0, 2);
+    return [...domain, ...type, ...other];
+}
+
 function allTags() {
     const set = new Set();
     State.todos.forEach(t => (t.tags || []).forEach(tag => set.add(tag)));
-    return [...set];
+    return [...set].sort((a, b) => a.localeCompare(b, 'zh'));
 }
+// 筛选面板的标签候选（datalist，输入时给建议，也允许手输新词）
 function renderTagFilter() {
-    const sel = $('filter-tag');
-    const cur = sel.value;
-    sel.innerHTML = '<option value="all">全部</option>' + allTags().map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
-    sel.value = [...sel.options].some(o => o.value === cur) ? cur : 'all';
+    const box = $('filter-tag-list');
+    if (!box) return;
+    box.innerHTML = allTags().map(t => `<option value="${escapeHtml(t)}"></option>`).join('');
 }
+
 function renderSavedFilters() {
     const bar = $('saved-filter-bar');
     if (!State.savedFilters.length) { bar.innerHTML = '<span style="font-size:0.8rem;color:var(--text-3)">暂无保存的筛选</span>'; return; }
@@ -1534,7 +1650,7 @@ function renderSavedFilters() {
     bar.querySelectorAll('.saved-filter-chip').forEach(chip => chip.addEventListener('click', (e) => {
         if (e.target.dataset.rm) return;
         const f = State.savedFilters.find(x => x.id === chip.dataset.id);
-        if (f) { Object.assign(State.filters, f.criteria); syncFilterUI(); renderCurrentView(); showNotification(`已应用筛选「${f.name}」`, 'info'); }
+        if (f) { State.filters = normalizeFilters(f.criteria); syncFilterUI(); renderCurrentView(); showNotification(`已应用筛选「${f.name}」`, 'info'); }
     }));
     bar.querySelectorAll('[data-rm]').forEach(el => el.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1545,12 +1661,23 @@ function renderSavedFilters() {
 function syncFilterUI() {
     $('filter-status').value = State.filters.status;
     $('filter-priority').value = State.filters.priority;
-    $('filter-tag').value = State.filters.tag;
+    $('filter-tag').value = State.filters.tag === 'all' ? '' : (State.filters.tag || '');
     $('filter-start').value = State.filters.start;
     $('filter-end').value = State.filters.end;
+    const cf = $('filter-created-from'), ct = $('filter-created-to');
+    const df = $('filter-completed-from'), dt = $('filter-completed-to');
+    if (cf) cf.value = State.filters.createdFrom || '';
+    if (ct) ct.value = State.filters.createdTo || '';
+    if (df) df.value = State.filters.completedFrom || '';
+    if (dt) dt.value = State.filters.completedTo || '';
     $('filter-archived').checked = State.filters.archived;
     const hu = $('filter-hide-unstarted'); if (hu) hu.checked = !!State.filters.hideUnstarted;
     $('search-input').value = State.filters.search;
+}
+// 老版本保存的筛选缺新字段，应用时补默认值，避免 undefined 进比较
+function normalizeFilters(f) {
+    const base = { search: '', status: 'all', priority: 'all', tag: '', start: '', end: '', createdFrom: '', createdTo: '', completedFrom: '', completedTo: '', archived: false, hideUnstarted: false };
+    return { ...base, ...(f || {}) };
 }
 
 // ---------------------------------------------------------------------------
@@ -1578,7 +1705,8 @@ const EXPORT_COLUMNS = [
     { key: 'subtasks', label: '子任务' },
     { key: 'pinned', label: '置顶' },
     { key: 'order', label: '排序号' },
-    { key: 'updatedAt', label: '更新时间' }
+    { key: 'updatedAt', label: '更新时间' },
+    { key: 'progressLog', label: '进度流水' }
 ];
 const EXPORT_COLUMN_KEYS = EXPORT_COLUMNS.map(c => c.key);
 
@@ -1871,6 +1999,7 @@ function applySettingsToUI() {
     $('set-show-note').checked = State.settings.showNote;
     $('set-auto-promote').checked = State.settings.autoPromote;
     $('set-auto-archive').checked = State.settings.autoArchive;
+    $('set-auto-tag').checked = State.settings.autoTag !== false;
     $('set-remind').checked = State.settings.remind;
     $('set-daily').checked = State.settings.dailyReminder;
     $('set-daily-time').value = State.settings.dailyTime;
@@ -2176,7 +2305,7 @@ function bindEvents() {
     $('save-task').addEventListener('click', saveTaskFromModal);
 
     // 任务模态框内交互
-    $('f-content').addEventListener('input', debounce((e) => { showSuggestions(e.target.value); }, 150));
+    $('f-content').addEventListener('input', debounce((e) => { showSuggestions(e.target.value); renderTagSuggest(e.target.value); }, 150));
     $('f-content').addEventListener('blur', () => { smartParse(); setTimeout(() => $('content-suggest').classList.remove('show'), 150); });
     $('f-repeat').addEventListener('change', (e) => $('f-repeat-interval').classList.toggle('hidden', e.target.value !== 'custom'));
     $('add-subtask').addEventListener('click', () => { State.editingSubtasks.push({ id: uid(), text: '', done: false }); renderSubtaskEditor(); });
@@ -2203,20 +2332,30 @@ function bindEvents() {
 
     // 筛选面板
     $('toggle-filter').addEventListener('click', () => $('filter-panel').classList.toggle('hidden'));
-    ['filter-status', 'filter-priority', 'filter-tag', 'filter-start', 'filter-end'].forEach(id => {
-        $(id).addEventListener('change', () => {
-            State.filters.status = $('filter-status').value;
-            State.filters.priority = $('filter-priority').value;
-            State.filters.tag = $('filter-tag').value;
-            State.filters.start = $('filter-start').value;
-            State.filters.end = $('filter-end').value;
-            renderCurrentView();
-        });
+    const FILTER_FIELDS = {
+        'filter-status': 'status',
+        'filter-priority': 'priority',
+        'filter-start': 'start',
+        'filter-end': 'end',
+        'filter-created-from': 'createdFrom',
+        'filter-created-to': 'createdTo',
+        'filter-completed-from': 'completedFrom',
+        'filter-completed-to': 'completedTo'
+    };
+    Object.entries(FILTER_FIELDS).forEach(([id, key]) => {
+        const el = $(id);
+        if (!el) return;
+        el.addEventListener('change', () => { State.filters[key] = el.value; renderCurrentView(); });
     });
+    // 标签是自由输入：边输边筛（防抖），不必等失焦
+    $('filter-tag').addEventListener('input', debounce((e) => {
+        State.filters.tag = e.target.value.trim();
+        renderCurrentView();
+    }, 250));
     $('filter-archived').addEventListener('change', (e) => { State.filters.archived = e.target.checked; renderCurrentView(); });
     $('filter-hide-unstarted').addEventListener('change', (e) => { State.filters.hideUnstarted = e.target.checked; renderCurrentView(); });
     $('clear-filters').addEventListener('click', () => {
-        State.filters = { search: '', status: 'all', priority: 'all', tag: 'all', start: '', end: '', archived: false, hideUnstarted: false };
+        State.filters = normalizeFilters(null);
         syncFilterUI(); renderCurrentView(); showNotification('筛选已清除', 'info');
     });
     $('save-filter').addEventListener('click', () => {
@@ -2255,9 +2394,10 @@ function bindEvents() {
             t.status = v; t.updatedAt = new Date().toISOString();
             if (v === 'completed') {
                 t.completedAt = new Date().toISOString(); t.progress = 100;
+                logProgressChange(t, 100);
                 if (!t.startedAt) t.startedAt = t.completedAt;
                 spawnRecurring(t);
-            } else if (v === 'pending') { t.completedAt = null; t.progress = 0; }
+            } else if (v === 'pending') { t.completedAt = null; t.progress = 0; logProgressChange(t, 0); }
         }, '批量修改状态完成');
         e.target.value = '';
     });
@@ -2347,6 +2487,18 @@ function bindEvents() {
     $('set-show-note').addEventListener('change', (e) => { State.settings.showNote = e.target.checked; persist.settings(); renderCurrentView(); });
     $('set-auto-promote').addEventListener('change', (e) => { State.settings.autoPromote = e.target.checked; persist.settings(); runAutomations(); renderCurrentView(); });
     $('set-auto-archive').addEventListener('change', (e) => { State.settings.autoArchive = e.target.checked; persist.settings(); runAutomations(); renderAll(); });
+    $('set-auto-tag').addEventListener('change', (e) => { State.settings.autoTag = e.target.checked; persist.settings(); });
+    $('refill-tags').addEventListener('click', () => {
+        let n = 0;
+        State.todos.forEach(t => {
+            if ((t.tags || []).length) return;
+            const tags = suggestTags(t.content, allTags());
+            if (tags.length) { t.tags = tags; n++; }
+        });
+        if (!n) { showNotification('没有需要补标签的任务', 'info'); return; }
+        saveTodos(); renderAll(); renderTagFilter();
+        showNotification(`已为 ${n} 个任务补齐标签`, 'success');
+    });
     $('set-remind').addEventListener('change', (e) => { State.settings.remind = e.target.checked; persist.settings(); });
     $('set-daily').addEventListener('change', (e) => { State.settings.dailyReminder = e.target.checked; persist.settings(); });
     $('set-daily-time').addEventListener('change', (e) => { State.settings.dailyTime = e.target.value; persist.settings(); });

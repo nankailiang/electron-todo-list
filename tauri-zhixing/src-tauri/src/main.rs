@@ -236,19 +236,84 @@ fn build_report_summary(todos: &Value, date: &str, author: &str, style: &str) ->
         .collect();
     // 完成的按完成时间从早到晚排，先完成的写在前面（同刻保持原顺序，sort_by 稳定）
     completed.sort_by(|a, b| done_at(a).cmp(&done_at(b)));
-    // 在办：截止日可以在未来，只要当天已经开始就算「今天在干这件事」
+    // 在办：截止日可以在未来，只要当天已经开始就算「今天在干这件事」；
+    // 但只有当天进度真的动过（或有改动痕迹）才写进日志，避免常年挂着的任务天天出现
+    let progress_days = |t: &Value| -> Vec<String> {
+        let mut entries: Vec<(String, i64)> = match t.get("progressLog").and_then(|v| v.as_array()) {
+            Some(a) => a
+                .iter()
+                .filter_map(|e| {
+                    let d = day_of(s_or(e, "d", &s_or(e, "date", "")));
+                    if d.is_empty() { return None; }
+                    let p = e
+                        .get("p")
+                        .or_else(|| e.get("progress"))
+                        .and_then(|v| v.as_i64())
+                        .unwrap_or(0);
+                    Some((d, p.clamp(0, 100)))
+                })
+                .collect(),
+            None => vec![],
+        };
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        let mut days = vec![];
+        let mut prev: Option<i64> = None;
+        for (d, p) in entries {
+            if prev == Some(p) { continue; }
+            days.push(d);
+            prev = Some(p);
+        }
+        days
+    };
     let mut in_progress: Vec<&Value> = scope
         .iter()
         .filter(|t| {
-            !archived(t)
-                && s_or(t, "status", "") == "in-progress"
-                && {
-                    let s = started_on(t);
-                    s.is_empty() || s.as_str() <= date
-                }
+            if archived(t) || s_or(t, "status", "") != "in-progress" {
+                return false;
+            }
+            let s = started_on(t);
+            if !s.is_empty() && s.as_str() > date {
+                return false;
+            }
+            let days = progress_days(t);
+            if days.is_empty() {
+                return started_on(t) == date || day_of(s_or(t, "updatedAt", &s_or(t, "createdAt", ""))) == date;
+            }
+            days.iter().any(|d| d == date)
         })
         .collect();
     in_progress.sort_by(|a, b| started_on(a).cmp(&started_on(b)).then_with(|| s_or(a, "date", "").cmp(&s_or(b, "date", ""))));
+    // 历史进度：生成过去某天的日志时用那天记下的完成度，而不是今天的值
+    let progress_at = |t: &Value| -> i64 {
+        let mut entries: Vec<(String, i64)> = match t.get("progressLog").and_then(|v| v.as_array()) {
+            Some(a) => a
+                .iter()
+                .filter_map(|e| {
+                    let d = day_of(s_or(e, "d", &s_or(e, "date", "")));
+                    if d.is_empty() { return None; }
+                    let p = e.get("p").or_else(|| e.get("progress")).and_then(|v| v.as_i64()).unwrap_or(0);
+                    Some((d, p.clamp(0, 100)))
+                })
+                .collect(),
+            None => vec![],
+        };
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        match entries.iter().rev().find(|(d, _)| d.as_str() <= date) {
+            Some((_, p)) => *p,
+            None => progress_of(t),
+        }
+    };
+    let in_progress_owned: Vec<Value> = in_progress
+        .iter()
+        .map(|t| {
+            let mut v = (*t).clone();
+            if let Value::Object(m) = &mut v {
+                m.insert("progress".to_string(), json!(progress_at(t)));
+            }
+            v
+        })
+        .collect();
+    let in_progress: Vec<&Value> = in_progress_owned.iter().collect();
     let mut pending: Vec<&Value> = due.iter().filter(|t| s_or(t, "status", "") == "pending").cloned().collect();
     pending.sort_by(|a, b| {
         s_or(a, "date", "")
@@ -380,10 +445,10 @@ fn fmt_moment(v: &str) -> String {
 }
 
 /// CSV 列顺序：前 14 列与导入模板 tools/templates/tasks.csv 一致，导出文件可直接再导入
-const CSV_COLUMN_ORDER: [&str; 20] = [
+const CSV_COLUMN_ORDER: [&str; 21] = [
     "content", "date", "startDate", "dueTime", "priority", "status", "progress", "tags", "note",
     "listId", "createdAt", "startedAt", "completedAt", "archived", "id", "repeat", "subtasks",
-    "pinned", "order", "updatedAt",
+    "pinned", "order", "updatedAt", "progressLog",
 ];
 
 fn pick_columns(columns: Option<Vec<String>>) -> Vec<String> {
@@ -452,6 +517,21 @@ fn csv_value(t: &Value, key: &str) -> String {
             .get("order")
             .and_then(|v| v.as_i64())
             .map(|n| n.to_string())
+            .unwrap_or_default(),
+        "progressLog" => t
+            .get("progressLog")
+            .and_then(|v| v.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|e| {
+                        let d = s_or(e, "d", &s_or(e, "date", ""));
+                        if d.len() != 10 { return None; }
+                        let p = e.get("p").or_else(|| e.get("progress")).and_then(|v| v.as_i64()).unwrap_or(0);
+                        Some(format!("{}:{}", d, p.clamp(0, 100)))
+                    })
+                    .collect::<Vec<_>>()
+                    .join("|")
+            })
             .unwrap_or_default(),
         _ => match t.get(key) {
             Some(Value::String(s)) => s.clone(),
@@ -692,6 +772,48 @@ fn normalize_todo(t: &Value) -> Option<Value> {
         _ => json!({"type": "none", "interval": 1}),
     };
     let order = t.get("order").and_then(|v| v.as_i64()).unwrap_or(0);
+    // 进度流水：数组直接用；字符串支持 JSON 或紧凑写法「2026-10-21:20|2026-10-29:80」
+    let progress_log: Value = match t.get("progressLog") {
+        Some(Value::Array(a)) => {
+            let mut out: Vec<Value> = a
+                .iter()
+                .filter_map(|e| {
+                    let d = s_or(e, "d", &s_or(e, "date", ""));
+                    let d = d.get(0..10).unwrap_or("").to_string();
+                    if d.len() != 10 { return None; }
+                    let p = e
+                        .get("p")
+                        .or_else(|| e.get("progress"))
+                        .and_then(|v| v.as_i64())
+                        .unwrap_or(0)
+                        .clamp(0, 100);
+                    Some(json!({"d": d, "p": p}))
+                })
+                .collect();
+            out.sort_by(|a, b| s_or(a, "d", "").cmp(&s_or(b, "d", "")));
+            Value::Array(out)
+        }
+        Some(Value::String(s)) if !s.trim().is_empty() => {
+            let s = s.trim();
+            if s.starts_with('[') {
+                Value::Array(vec![])
+            } else {
+                let mut out: Vec<Value> = s
+                    .split(|c| c == '|' || c == ';')
+                    .filter_map(|pair| {
+                        let mut it = pair.splitn(2, |c| c == ':' || c == '：');
+                        let d = it.next().unwrap_or("").trim().to_string();
+                        if d.len() != 10 { return None; }
+                        let p = it.next().and_then(|x| x.trim().parse::<i64>().ok()).unwrap_or(0).clamp(0, 100);
+                        Some(json!({"d": d, "p": p}))
+                    })
+                    .collect();
+                out.sort_by(|a, b| s_or(a, "d", "").cmp(&s_or(b, "d", "")));
+                Value::Array(out)
+            }
+        }
+        _ => json!([]),
+    };
     Some(json!({
         "id": id,
         "listId": s_or(t, "listId", "default"),
@@ -703,6 +825,7 @@ fn normalize_todo(t: &Value) -> Option<Value> {
         "note": s_or(t, "note", ""),
         "status": status,
         "progress": progress,
+        "progressLog": progress_log,
         "tags": tags,
         "subtasks": subtasks,
         "pinned": flag("pinned"),

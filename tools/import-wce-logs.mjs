@@ -395,6 +395,8 @@ function toMergedTask(content, run, ctx) {
         createdAt: isoOf(first.date, 9),
         startedAt: isoOf(first.date, 10),
         completedAt: open ? '' : isoOf(last.date, 18),
+        // 进度流水：哪天推到多少，日报据此判断「当天有没有实际进展」
+        progressLog: run.map(it => `${it.date}:${it.progress || 0}`).join('|'),
         archived: 'false',
         order: 0,
     };
@@ -456,7 +458,7 @@ const tasksPath = join(outDir, 'tasks.csv');
 const reportsPath = join(outDir, 'reports.csv');
 
 writeFileSync(tasksPath, toCSV(
-    ['id', 'content', 'note', 'priority', 'status', 'progress', 'listId', 'date', 'startDate', 'dueTime', 'tags', 'createdAt', 'startedAt', 'completedAt', 'archived', 'order'],
+    ['id', 'content', 'note', 'priority', 'status', 'progress', 'listId', 'date', 'startDate', 'dueTime', 'tags', 'createdAt', 'startedAt', 'completedAt', 'archived', 'order', 'progressLog'],
     tasks), 'utf8');
 writeFileSync(reportsPath, toCSV(
     ['id', 'date', 'title', 'content', 'createdAt', 'updatedAt'],

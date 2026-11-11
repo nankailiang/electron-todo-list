@@ -187,15 +187,33 @@
                         </div>
                         <div>
                             <label class="form-label">标签</label>
-                            <select id="filter-tag" class="form-control"><option value="all">全部</option></select>
+                            <input type="text" id="filter-tag" class="form-control" list="filter-tag-list"
+                                   placeholder="输入标签，可多个（逗号分隔）" autocomplete="off">
+                            <datalist id="filter-tag-list"></datalist>
                         </div>
                         <div>
-                            <label class="form-label">起始日期</label>
-                            <input type="date" id="filter-start" class="form-control">
+                            <label class="form-label">截止日期</label>
+                            <div class="range-row">
+                                <input type="date" id="filter-start" class="form-control" title="起始日期">
+                                <span class="range-sep">~</span>
+                                <input type="date" id="filter-end" class="form-control" title="结束日期">
+                            </div>
                         </div>
                         <div>
-                            <label class="form-label">结束日期</label>
-                            <input type="date" id="filter-end" class="form-control">
+                            <label class="form-label">创建时间</label>
+                            <div class="range-row">
+                                <input type="date" id="filter-created-from" class="form-control" title="创建时间从">
+                                <span class="range-sep">~</span>
+                                <input type="date" id="filter-created-to" class="form-control" title="创建时间到">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="form-label">完成时间</label>
+                            <div class="range-row">
+                                <input type="date" id="filter-completed-from" class="form-control" title="完成时间从">
+                                <span class="range-sep">~</span>
+                                <input type="date" id="filter-completed-to" class="form-control" title="完成时间到">
+                            </div>
                         </div>
                         <div style="display:flex;gap:8px;">
                             <button class="btn btn-secondary" id="clear-filters"><svg class="icon"><use href="#i-refresh"/></svg> 清除</button>
@@ -325,6 +343,7 @@
                 <div class="form-group">
                     <label class="form-label">标签（逗号分隔）</label>
                     <input type="text" id="f-tags" class="form-control" placeholder="如：工作, 重要, 项目A">
+                    <div class="tag-suggest" id="tag-suggest"></div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">完成度 <span class="progress-val" id="f-progress-val">0%</span></label>
@@ -535,6 +554,13 @@
                 <div class="setting-row">
                     <div class="setting-info"><div class="st">自动归档已完成</div><div class="sd">结办超过 3 天自动归档</div></div>
                     <label class="switch"><input type="checkbox" id="set-auto-archive"><span class="slider"></span></label>
+                </div>
+                <div class="setting-row">
+                    <div class="setting-info"><div class="st">按内容自动打标签</div><div class="sd">保存任务时用已有标签识别内容，自动补上匹配项</div></div>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <button class="btn btn-ghost btn-sm" id="refill-tags">给全部任务补齐</button>
+                        <label class="switch"><input type="checkbox" id="set-auto-tag" checked><span class="slider"></span></label>
+                    </div>
                 </div>
                 <div class="setting-row">
                     <div class="setting-info"><div class="st">到期提醒</div><div class="sd">到期/逾期通过系统通知提醒</div></div>
