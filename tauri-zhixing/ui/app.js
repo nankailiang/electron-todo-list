@@ -2059,6 +2059,9 @@ async function newReport() {
 }
 
 async function generateReportContent(date) {
+    // 后端是按磁盘上的设置决定日报风格的，而设置写盘有 300ms 防抖：
+    // 刚切换「纯文本/Markdown」就点生成，会拿到上一次的风格。这里先落盘再生成。
+    try { await window.electronAPI.saveSettings(State.settings); } catch (e) { /* 落盘失败不阻塞生成 */ }
     const res = await window.electronAPI.generateReport(date);
     if (!res.success) { showNotification('生成失败: ' + res.error, 'error'); return; }
     if (!$('report-title').value.trim()) $('report-title').value = res.summary.title || defaultReportTitle();
@@ -2285,9 +2288,12 @@ function parseQuickTask(text) {
     }
 
     // 时间
-    const mt = content.match(/(上午|下午|晚上|中午|凌晨)?\s*(\d{1,2})[:：点时](\d{1,2})?分?/);
+    // 时间：支持「8点」「8:30」「8点30」「8点半」「晚上8点半」
+    const mt = content.match(/(上午|下午|晚上|中午|凌晨)?\s*(\d{1,2})[:：点时](\d{1,2}|半)?分?/);
     if (mt) {
-        let h = parseInt(mt[2], 10); const mi = mt[3] ? parseInt(mt[3], 10) : 0;
+        let h = parseInt(mt[2], 10);
+        // 「半」= 30 分；此前只认数字，「晚上8点半」会被截成 20:00 并把「半」留在任务内容里
+        const mi = mt[3] === '半' ? 30 : (mt[3] ? parseInt(mt[3], 10) : 0);
         const per = mt[1];
         if ((per === '下午' || per === '晚上') && h < 12) h += 12;
         if (per === '中午' && h < 12) h += 12;
