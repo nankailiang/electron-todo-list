@@ -122,7 +122,7 @@
                     </div>
                     <div class="chart-card" style="margin-bottom:20px;">
                         <h4><svg class="icon"><use href="#i-bulb"/></svg> 效率分析</h4>
-                        <div id="efficiency-body" style="font-size:0.88rem;color:var(--text-2);"></div>
+                        <div id="efficiency-body" style="font-size:var(--fs-base);color:var(--text-2);"></div>
                     </div>
                 </div>
 
@@ -134,34 +134,36 @@
                         <svg class="icon"><use href="#i-search"/></svg>
                         <input type="text" id="search-input" class="form-control" placeholder="搜索任务（支持拼音首字母、模糊匹配）">
                     </div>
-                    <div class="chip-select">
-                        <label>排序</label>
-                        <select id="sort-primary">
-                            <option value="manual">手动</option>
-                            <option value="priority">优先级</option>
-                            <option value="date">截止日期</option>
-                            <option value="created">创建时间</option>
-                            <option value="completed">完成时间</option>
-                            <option value="name">名称</option>
-                        </select>
-                        <select id="sort-dir">
-                            <option value="desc">降序</option>
-                            <option value="asc">升序</option>
-                        </select>
+                    <div class="toolbar-group">
+                        <div class="chip-select">
+                            <label>排序</label>
+                            <select id="sort-primary">
+                                <option value="manual">手动</option>
+                                <option value="priority">优先级</option>
+                                <option value="date">截止日期</option>
+                                <option value="created">创建时间</option>
+                                <option value="completed">完成时间</option>
+                                <option value="name">名称</option>
+                            </select>
+                            <select id="sort-dir">
+                                <option value="desc">降序</option>
+                                <option value="asc">升序</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-ghost" id="toggle-filter"><svg class="icon"><use href="#i-filter"/></svg> 筛选</button>
+                        <button class="btn btn-ghost" id="select-mode-btn"><svg class="icon"><use href="#i-square-check"/></svg> 多选</button>
+                        <div class="chip-select">
+                            <label>导入</label>
+                            <select id="import-select">
+                                <option value="">选择格式</option>
+                                <option value="json">JSON</option>
+                                <option value="csv">CSV</option>
+                                <option value="txt">TXT</option>
+                                <option value="md">Markdown</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-ghost" id="open-export"><svg class="icon"><use href="#i-download"/></svg> 导出</button>
                     </div>
-                    <button class="btn btn-ghost" id="toggle-filter"><svg class="icon"><use href="#i-filter"/></svg> 筛选</button>
-                    <button class="btn btn-ghost" id="select-mode-btn"><svg class="icon"><use href="#i-square-check"/></svg> 多选</button>
-                    <div class="chip-select">
-                        <label>导入</label>
-                        <select id="import-select">
-                            <option value="">选择格式</option>
-                            <option value="json">JSON</option>
-                            <option value="csv">CSV</option>
-                            <option value="txt">TXT</option>
-                            <option value="md">Markdown</option>
-                        </select>
-                    </div>
-                    <button class="btn btn-ghost" id="open-export"><svg class="icon"><use href="#i-download"/></svg> 导出</button>
                 </div>
 
                 <!-- 高级筛选面板 -->
@@ -228,10 +230,10 @@
                             <button class="btn btn-ghost" id="save-filter"><svg class="icon"><use href="#i-bookmark"/></svg> 保存</button>
                         </div>
                     </div>
-                    <label style="display:flex;align-items:center;gap:6px;margin-top:12px;font-size:0.85rem;color:var(--text-2);">
+                    <label style="display:flex;align-items:center;gap:6px;margin-top:12px;font-size:var(--fs-sm);color:var(--text-2);">
                         <input type="checkbox" id="filter-archived"> 显示归档任务
                     </label>
-                    <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:0.85rem;color:var(--text-2);">
+                    <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:var(--fs-sm);color:var(--text-2);">
                         <input type="checkbox" id="filter-hide-unstarted"> 隐藏未开始任务（开始日晚于今天）
                     </label>
                     <!-- 保存筛选：行内命名（Electron 不支持 window.prompt） -->
@@ -287,15 +289,19 @@
                             <button data-calmode="week" class="active">周 · 时间块</button>
                         </div>
                     </div>
+                    <div class="cal-empty hidden" id="cal-empty"></div>
                     <div class="calendar-grid" id="calendar-grid"></div>
                     <div class="week-timeline hidden" id="week-timeline"></div>
                 </div>
 
                 <div id="empty-state" class="empty-state">
                     <svg class="icon empty-ill"><use href="#i-clipboard"/></svg>
-                    <h3>这里空空如也</h3>
+                    <h3 id="empty-title">这里空空如也</h3>
                     <p id="empty-text">点击「新建任务」开始记录你的第一件事</p>
-                    <button class="btn btn-primary" id="empty-add-btn"><svg class="icon"><use href="#i-plus"/></svg> 新建任务</button>
+                    <div class="empty-actions">
+                        <button class="btn btn-primary" id="empty-add-btn"><svg class="icon"><use href="#i-plus"/></svg> 新建任务</button>
+                        <button class="btn btn-ghost hidden" id="empty-clear-btn"><svg class="icon"><use href="#i-refresh"/></svg> 清除筛选条件</button>
+                    </div>
                 </div>
                 </div><!-- /task-view-wrap -->
             </div>
@@ -351,7 +357,7 @@
                 <input type="hidden" id="f-time">
                 <div class="form-group">
                     <label class="form-label">标签（逗号分隔）</label>
-                    <input type="text" id="f-tags" class="form-control" placeholder="如：工作, 重要, 项目A">
+                    <input type="text" id="f-tags" class="form-control" placeholder="如：工作，重要，项目A">
                     <div class="tag-suggest" id="tag-suggest"></div>
                 </div>
                 <div class="form-group">
@@ -490,6 +496,7 @@
                         </div>
                     </div>
                     <div class="export-cols" id="export-cols"></div>
+                    <button type="button" class="export-cols-more" id="export-cols-more">展开全部字段</button>
                     <div class="form-hint" id="export-hint">CSV 前 14 列与导入模板完全一致，导出的文件可以原样再导入；「任务内容」为必选列。</div>
                 </div>
             </div>
@@ -508,9 +515,9 @@
                 <button class="close-btn" data-close="import-modal">&times;</button>
             </div>
             <div class="modal-body">
-                <p style="margin-bottom:10px;color:var(--text-2);font-size:0.9rem;">共解析到 <b id="import-count">0</b> 条任务，<b id="conflict-count">0</b> 条与现有任务重复。</p>
+                <p style="margin-bottom:10px;color:var(--text-2);font-size:var(--fs-base);">共解析到 <b id="import-count">0</b> 条任务，<b id="conflict-count">0</b> 条与现有任务重复。</p>
                 <div class="conflict-options">
-                    <span style="font-size:0.85rem;color:var(--text-3);">重复任务处理：</span>
+                    <span style="font-size:var(--fs-sm);color:var(--text-2);">重复任务处理：</span>
                     <label><input type="radio" name="conflict" value="skip" checked> 跳过</label>
                     <label><input type="radio" name="conflict" value="overwrite"> 覆盖</label>
                     <label><input type="radio" name="conflict" value="merge"> 合并（保留两者）</label>
@@ -539,7 +546,7 @@
             <div class="modal-body">
                 <div class="setting-group-title">外观</div>
                 <div class="setting-row">
-                    <div class="setting-info"><div class="st">深色模式</div><div class="sd">适配不同使用环境</div></div>
+                    <div class="setting-info"><div class="st">深色模式</div><div class="sd">界面与图表切为深色，夜间或弱光下更省眼</div></div>
                     <label class="switch"><input type="checkbox" id="set-theme"><span class="slider"></span></label>
                 </div>
                 <div class="setting-row">
@@ -616,7 +623,7 @@
                 <button class="close-btn" data-close="backup-modal">&times;</button>
             </div>
             <div class="modal-body">
-                <p style="color:var(--text-2);font-size:0.88rem;margin-bottom:12px;">系统每天自动备份并保留最近 7 天。可手动备份或从历史备份恢复。</p>
+                <p style="color:var(--text-2);font-size:var(--fs-base);margin-bottom:12px;">系统每天自动备份并保留最近 7 天。可手动备份或从历史备份恢复。</p>
                 <button class="btn btn-primary btn-sm" id="do-backup" style="margin-bottom:14px;"><svg class="icon"><use href="#i-download"/></svg> 立即备份</button>
                 <div id="backup-list"></div>
             </div>
@@ -695,7 +702,7 @@
             </div>
             <div class="confirm-body">
                 <input type="password" id="pass-input" class="form-control" placeholder="请输入口令">
-                <div id="pass-hint" style="font-size:0.8rem;color:var(--text-3);margin-top:8px;"></div>
+                <div id="pass-hint" style="font-size:var(--fs-sm);color:var(--text-2);margin-top:8px;"></div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" data-close="pass-modal">取消</button>

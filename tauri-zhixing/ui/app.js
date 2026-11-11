@@ -504,7 +504,45 @@ function renderCurrentView() {
     else if (view === 'kanban') { renderKanban(visible); }
     else if (view === 'calendar') { renderCalendar(); }
 
-    if (view !== 'calendar' && visible.length === 0) empty.classList.add('show');
+    // E1：空态分三种场景（真空库 / 搜索无结果 / 当前清单无任务），前两者给对应出口
+    if (view !== 'calendar' && visible.length === 0) {
+        let scene = 'list';
+        if (!State.todos.length) scene = 'empty';
+        else if (hasActiveFilters()) scene = 'filtered';
+        renderEmptyState(scene);
+        empty.classList.add('show');
+    }
+}
+
+// 当前是否有搜索词或任一筛选条件生效
+function hasActiveFilters() {
+    const f = normalizeFilters(State.filters);
+    return !!(f.search || f.status !== 'all' || f.priority !== 'all' || f.tag ||
+        f.start || f.end || f.startFrom || f.startTo ||
+        f.createdFrom || f.createdTo || f.completedFrom || f.completedTo ||
+        f.archived || f.hideUnstarted);
+}
+
+function renderEmptyState(scene) {
+    const title = $('empty-title'), text = $('empty-text');
+    const addBtn = $('empty-add-btn'), clearBtn = $('empty-clear-btn');
+    if (!title || !text) return;
+    if (scene === 'filtered') {
+        title.textContent = '没有符合条件的任务';
+        text.textContent = '当前搜索词或筛选条件太窄了，试着放宽或直接清除条件';
+        if (addBtn) addBtn.classList.add('hidden');
+        if (clearBtn) clearBtn.classList.remove('hidden');
+    } else if (scene === 'list') {
+        title.textContent = '这个清单还没有任务';
+        text.textContent = '任务都在别的清单里，或还没开始记录；切换清单或直接新建一条';
+        if (addBtn) addBtn.classList.remove('hidden');
+        if (clearBtn) clearBtn.classList.add('hidden');
+    } else {
+        title.textContent = '这里空空如也';
+        text.textContent = '点击「新建任务」开始记录你的第一件事';
+        if (addBtn) addBtn.classList.remove('hidden');
+        if (clearBtn) clearBtn.classList.add('hidden');
+    }
 }
 
 // 底部导航高亮同步（与当前视图/仪表盘一致）
@@ -521,13 +559,15 @@ function syncBottomNav() {
 
 function updateHeader() {
     const lid = State.settings.currentListId;
+    const dot = $('cur-list-color');
     if (lid === 'all') {
         $('cur-list-name').textContent = '全部任务';
-        $('cur-list-color').style.background = 'var(--text-3)';
+        dot.classList.add('none');   // O5：默认清单没有颜色，不显示灰点
     } else {
         const l = State.lists.find(x => x.id === lid);
         $('cur-list-name').textContent = l ? l.name : '任务';
-        $('cur-list-color').style.background = l ? l.color : 'var(--primary)';
+        if (l && l.color) { dot.style.background = l.color; dot.classList.remove('none'); }
+        else { dot.classList.add('none'); }
     }
 }
 
@@ -540,10 +580,10 @@ function listCount(id) {
 function renderSidebar() {
     const nav = $('list-nav');
     let html = `<div class="list-item ${State.settings.currentListId === 'all' ? 'active' : ''}" data-list="all">
-        <span class="dot" style="background:var(--text-3)"></span> 全部任务 <span class="count">${listCount('all')}</span></div>`;
+        <span class="dot none"></span> 全部任务 <span class="count">${listCount('all')}</span></div>`;
     State.lists.forEach(l => {
         html += `<div class="list-item ${State.settings.currentListId === l.id ? 'active' : ''}" data-list="${l.id}">
-            <span class="dot" style="background:${l.color}"></span>
+            <span class="dot ${l.color ? '' : 'none'}" style="background:${l.color || 'transparent'}"></span>
             <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(l.name)}</span>
             <span class="count">${listCount(l.id)}</span>
             ${l.id !== 'default' ? `<svg class="icon list-del" data-del-list="${l.id}"><use href="#i-times"/></svg>` : ''}
@@ -1178,6 +1218,7 @@ function renderKanban(visible) {
         return `<div class="kanban-col" data-status="${c.key}">
             <div class="kanban-col-head"><span class="dot" style="background:${c.color}"></span>${c.label}<span class="k-count">${items.length}</span></div>
             <div class="kanban-cards" data-status="${c.key}">
+                ${items.length === 0 ? `<div class="kanban-empty">暂无${c.label}任务<br>可把卡片拖到这里</div>` : ''}
                 ${items.map(t => `
                     <div class="kanban-card pr-${t.priority} ${t.pinned ? 'pinned' : ''}" draggable="true" data-id="${t.id}">
                         <div class="kc-content">${escapeHtml(t.content)}</div>
@@ -1290,6 +1331,19 @@ function renderMonthGrid() {
     });
     grid.innerHTML = html;
 
+    // E1：本月一条任务都没有时给出空态提示（此前只有一片空网格）
+    const calEmpty = $('cal-empty');
+    if (calEmpty) {
+        if (monthCount === 0) {
+            calEmpty.classList.remove('hidden');
+            calEmpty.innerHTML = visible.length === 0
+                ? '本月没有任务，当前筛选/搜索也没有命中任何记录。<b>换个条件</b>或直接新建任务试试。'
+                : `本月（${year} 年 ${month + 1} 月）没有任务落在任何日期上，筛选后共 ${visible.length} 条。<b>任务只有设置了「截止日期」才会出现在日历里。</b>`;
+        } else {
+            calEmpty.classList.add('hidden');
+        }
+    }
+
     // 「+N 更多」展开 / 收起（否则一天超过 3 条就永远看不到）
     grid.querySelectorAll('.cal-more').forEach(el => {
         el.addEventListener('click', (e) => {
@@ -1343,6 +1397,19 @@ function renderWeekTimeline() {
     const weekCount = Object.values(byDate).reduce((n, arr) => n + arr.length, 0);
     const sumEl = $('cal-summary');
     if (sumEl) sumEl.textContent = `本周 ${weekCount} 条 · 筛选后共 ${visible.length} 条`;
+
+    // E1：周视图同样补空态
+    const calEmptyW = $('cal-empty');
+    if (calEmptyW) {
+        if (weekCount === 0) {
+            calEmptyW.classList.remove('hidden');
+            calEmptyW.innerHTML = visible.length === 0
+                ? '本周没有任务，当前筛选/搜索也没有命中任何记录。<b>换个条件</b>或直接新建任务试试。'
+                : `本周（${days[0]} ~ ${days[6]}）没有任务落在任何日期上，筛选后共 ${visible.length} 条。<b>任务只有设置了「截止日期」才会出现在日历里。</b>`;
+        } else {
+            calEmptyW.classList.add('hidden');
+        }
+    }
 
     const WD = ['一', '二', '三', '四', '五', '六', '日'];
     const H0 = WT.h0, H1 = WT.h1, HH = WT.hourh, slots = H1 - H0;
@@ -1556,7 +1623,7 @@ function renderLine(scope) {
             <polyline points="${area}" fill="url(#lineGrad)" stroke="none"/>
             <polyline points="${poly}" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
             ${pts.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="var(--primary)"/><circle cx="${p[0]}" cy="${p[1]}" r="7" fill="var(--primary)" opacity="0.15"/><text x="${p[0]}" y="${p[1] - 10}" font-size="10" font-weight="600" fill="var(--text-2)" text-anchor="middle">${counts[i]}</text>`).join('')}
-            ${days.map((d, i) => `<text x="${pad + i * stepX}" y="${H - 6}" font-size="9" fill="var(--text-3)" text-anchor="middle">${d.slice(5)}</text>`).join('')}
+            ${days.map((d, i) => `<text x="${pad + i * stepX}" y="${H - 6}" font-size="10" fill="var(--text-2)" text-anchor="middle">${d.slice(5)}</text>`).join('')}
         </svg>`;
 }
 
@@ -1579,8 +1646,8 @@ function renderBar(scope) {
         const isToday = days[i] === todayISO();
         const barColor = isToday ? 'var(--primary)' : 'var(--primary-soft-2)';
         bars += `<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="6" fill="${barColor}"/>
-            <text x="${x + bw / 2}" y="${y - 5}" font-size="10" font-weight="600" fill="${isToday ? 'var(--primary)' : 'var(--text-2)'}" text-anchor="middle">${c}</text>
-            <text x="${x + bw / 2}" y="${H - 6}" font-size="9" font-weight="500" fill="${isToday ? 'var(--primary)' : 'var(--text-3)'}" text-anchor="middle">${labels[i]}</text>`;
+            <text x="${x + bw / 2}" y="${y - 5}" font-size="10" font-weight="600" fill="${isToday ? 'var(--primary-text)' : 'var(--text-2)'}" text-anchor="middle">${c}</text>
+            <text x="${x + bw / 2}" y="${H - 6}" font-size="10" font-weight="500" fill="${isToday ? 'var(--primary-text)' : 'var(--text-2)'}" text-anchor="middle">${labels[i]}</text>`;
     });
     $('bar-chart').innerHTML = `<svg width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${bars}<line x1="0" y1="${H - padB}" x2="${W}" y2="${H - padB}" stroke="var(--border)" stroke-width="1"/></svg>`;
 }
@@ -1590,7 +1657,7 @@ function renderTags(active) {
     active.forEach(t => (t.tags || []).forEach(tag => { map[tag] = (map[tag] || 0) + 1; }));
     const all = Object.entries(map).sort((a, b) => b[1] - a[1]);
     const box = $('tag-chart');
-    if (!all.length) { box.innerHTML = '<p style="font-size:0.82rem;color:var(--text-3);">暂无标签数据</p>'; return; }
+    if (!all.length) { box.innerHTML = '<p style="font-size:var(--fs-sm);color:var(--text-2);">暂无标签数据</p>'; return; }
     const top = all.slice(0, 8);
     const max = top[0][1];
     const marks = all.reduce((s, e) => s + e[1], 0);   // 全部标记次数
@@ -1689,7 +1756,7 @@ function renderTagFilter() {
 
 function renderSavedFilters() {
     const bar = $('saved-filter-bar');
-    if (!State.savedFilters.length) { bar.innerHTML = '<span style="font-size:0.8rem;color:var(--text-3)">暂无保存的筛选</span>'; return; }
+    if (!State.savedFilters.length) { bar.innerHTML = '<span style="font-size:var(--fs-sm);color:var(--text-2)">暂无保存的筛选</span>'; return; }
     bar.innerHTML = State.savedFilters.map(f => `
         <span class="saved-filter-chip" data-id="${f.id}">${I('bookmark')}${escapeHtml(f.name)}<svg class="icon rm" data-rm="${f.id}"><use href="#i-times"/></svg></span>`).join('');
     bar.querySelectorAll('.saved-filter-chip').forEach(chip => chip.addEventListener('click', (e) => {
@@ -1902,7 +1969,7 @@ function confirmImport() {
 async function openBackup() {
     const backups = await window.electronAPI.listBackups();
     const box = $('backup-list');
-    if (!backups.length) { box.innerHTML = '<p style="color:var(--text-3);font-size:0.85rem;">暂无备份</p>'; }
+    if (!backups.length) { box.innerHTML = '<p style="color:var(--text-2);font-size:var(--fs-sm);">暂无备份</p>'; }
     else {
         box.innerHTML = backups.map(b => `
             <div class="backup-item">
@@ -1939,7 +2006,7 @@ function openReportModal() {
 function renderReportHistory() {
     const box = $('report-history');
     if (!State.reports.length) {
-        box.innerHTML = '<p style="font-size:0.82rem;color:var(--text-3);padding:6px 2px;">还没有日报，点击「写新日报」开始记录。</p>';
+        box.innerHTML = '<p style="font-size:var(--fs-sm);color:var(--text-2);padding:6px 2px;">还没有日报，点击「写新日报」开始记录。</p>';
         return;
     }
     const sorted = [...State.reports].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
@@ -2408,6 +2475,12 @@ function bindEvents() {
         State.filters = normalizeFilters(null);
         syncFilterUI(); renderCurrentView(); showNotification('筛选已清除', 'info');
     });
+    // 空态里的「清除筛选条件」：连搜索框一起清掉
+    $('empty-clear-btn').addEventListener('click', () => {
+        State.filters = normalizeFilters(null);
+        const si = $('search-input'); if (si) si.value = '';
+        syncFilterUI(); renderCurrentView(); showNotification('已清除搜索与筛选条件', 'info');
+    });
     $('save-filter').addEventListener('click', () => {
         const row = $('save-filter-row');
         row.classList.remove('hidden');
@@ -2467,6 +2540,12 @@ function bindEvents() {
     $('export-col-all').addEventListener('click', () => syncExportColChecks([...EXPORT_COLUMN_KEYS]));
     $('export-col-none').addEventListener('click', () => syncExportColChecks(['content']));
     $('export-col-reset').addEventListener('click', () => syncExportColChecks([...EXPORT_COLUMN_KEYS]));
+    // O1：字段区高度受限时提供「展开全部 / 收起」
+    $('export-cols-more').addEventListener('click', () => {
+        const box = $('export-cols');
+        const expanded = box.classList.toggle('expanded');
+        $('export-cols-more').textContent = expanded ? '收起字段列表' : '展开全部字段';
+    });
     document.querySelectorAll('input[name="export-format"]').forEach(r => r.addEventListener('change', updateExportFormatHint));
     $('import-select').addEventListener('change', (e) => { if (e.target.value) { doImport(e.target.value); e.target.value = ''; } });
     $('confirm-import').addEventListener('click', confirmImport);
@@ -2587,6 +2666,21 @@ function bindEvents() {
 
     // 全局快捷键
     document.addEventListener('keydown', handleShortcuts);
+
+    // E7：内容区滚动时让浮动导航淡出让开，停手 500ms 恢复
+    bindNavAutoFade();
+}
+
+function bindNavAutoFade() {
+    const nav = $('bottom-nav');
+    const scroller = document.querySelector('.content');
+    if (!nav || !scroller) return;
+    let timer = null;
+    scroller.addEventListener('scroll', () => {
+        nav.classList.add('scrolling');
+        clearTimeout(timer);
+        timer = setTimeout(() => nav.classList.remove('scrolling'), 500);
+    }, { passive: true });
 }
 
 function persistSort() { localStorage.setItem('sortPref', JSON.stringify(State.sort)); }

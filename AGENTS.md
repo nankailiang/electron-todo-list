@@ -127,9 +127,18 @@ backups/          # 每日备份 todo-backup-YYYY-MM-DD.json，保留 7 天（�
 
 ## 10. 编码约定 / 风格
 - **UI 中文**；配色用 `styles.css` 顶部 CSS 变量（`--primary` 青绿等），改主题只动变量；深色在 `html[data-theme="dark"]`。
+- **设计 token（2026-11 走查后统一，新增样式请只用 token，不要再写裸 px/rem）**：
+  - 颜色：`--text/-2/-3`（-3 仅装饰，不承载正文）、`--primary`（**只用于图标/描边/图表**）、`--primary-text`（主色文字，白底 5.22）、`--primary-btn`(`#23805F`)/`--primary-btn-2`（实心按钮底，白字 4.86）、`--on-solid`（实心控件上的文字，浅色白/深色深）、`--focus-ring`。
+  - 功能色成对：`--danger`/`--danger-text`/`--danger-btn`，success / warning / info 同理。**色块描边用 `--xxx`，文字用 `--xxx-text`，实心底用 `--xxx-btn`**。
+  - 间距：`--sp-1..6`（4/8/12/16/20/24）。圆角：`--radius-xxs/xs/sm/radius/pill`（6/8/12/18/胶囊）。
+  - 字阶：`--fs-xs..2xl`（12/13/14/16/20/28/40），正文 `--fs-base`=14px。
+- **对比度硬线**：正文与图标文字 ≥4.5:1，装饰 ≥3:1。改颜色先跑一遍 WCAG 计算，别凭眼感。
+- **状态**：交互元素必须有 `:hover`、`:active`、`:focus-visible`、`:disabled`。全局 `:focus-visible` 已有 2px 描边，组件内不要再写 `outline: none`（`select` 用 `:focus-visible` 豁免鼠标点击）。
+- **弹窗骨架**：`.modal-content` 是 flex 列 + `max-height:90vh`，`.modal-body` 独立滚动、header/footer 固定。**不要在 `.modal-body` 上再写 `max-height`**，也不要让 footer 参与滚动。
+- **空态**：列表用 `renderEmptyState(scene)`，scene 分 `empty`（真空库）/`filtered`（搜索或筛选无结果，给「清除筛选条件」）/`list`（当前清单为空）；日历用 `#cal-empty` 横幅；看板用 `.kanban-empty`。
 - **图标**：`index.html` 内联 `<symbol id="i-xxx">`，用时 `<svg class="icon"><use href="#i-xxx"/></svg>`。`.icon` 已设 `fill:none; stroke:currentColor; stroke-width:1.8`（**线条图标靠描边**；点状图标自带 `fill="currentColor" stroke="none"`）。新增图标记得成对处理，否则会变成实心黑块。
-- **导航**：只有底部浮动导航（任务/看板/日历/统计/日报/设置），顶部已移除重复的视图切换。切视图用 `setView()`/`renderCurrentView()`，并调用 `syncBottomNav()` 高亮。
-- **清单颜色**：用 `#list-swatches` 常用色板（点击写隐藏 `#list-color`），`syncListSwatches()` 同步高亮。
+- **导航**：只有底部浮动导航（任务/看板/日历/统计/日报/设置），顶部已移除重复的视图切换。切视图用 `setView()`/`renderCurrentView()`，并调用 `syncBottomNav()` 高亮。导航滚动时加 `.scrolling` 淡出让开正文（`bindNavAutoFade`），内容区 `padding-bottom:118px` 保证末尾不被压。
+- **清单颜色**：用 `#list-swatches` 常用色板（点击写隐藏 `#list-color`），`syncListSwatches()` 同步高亮。清单没有颜色时 `.dot.none` / `.list-color.none` 隐藏色点，不要画灰点。
 - **截止时间**：任务表单里是隐藏字段 `#f-time`（用户不想手填；但仍支持文字自动识别时间/自动排程/周视图拖拽赋值）。
 - 写文件优先 `Edit`；不要提交 `node_modules/ dist/ build/ release/ *.exe tauri-*-target .workbuddy/`（.gitignore 已覆盖）。
 
