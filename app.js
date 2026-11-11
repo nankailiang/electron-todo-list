@@ -160,6 +160,8 @@ function fmtMD(iso) { const p = iso.split('-'); return `${parseInt(p[1], 10)}月
 // 把 UTC 时间戳按其本地日期归日（用于完成时间统计分组）
 function tsDay(ts) {
     if (!ts) return '';
+    // 纯日期（YYYY-MM-DD）直接返回，避免 new Date 按 UTC 解析后跨时区偏一天
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(ts))) return String(ts);
     const d = new Date(ts);
     return isNaN(d.getTime()) ? '' : localISO(d);
 }
@@ -418,6 +420,13 @@ function getVisibleTodos() {
         // 截止日期范围
         if (f.start && (!t.date || t.date < f.start)) return false;
         if (f.end && (!t.date || t.date > f.end)) return false;
+        // 开始日期范围（任务自身的 startDate，没设开始日期的不参与）
+        if (f.startFrom || f.startTo) {
+            const sd = tsDay(t.startDate);
+            if (!sd) return false;
+            if (f.startFrom && sd < f.startFrom) return false;
+            if (f.startTo && sd > f.startTo) return false;
+        }
         // 创建时间范围（按本地日期比较）
         if (f.createdFrom || f.createdTo) {
             const cd = tsDay(t.createdAt);
@@ -1235,6 +1244,7 @@ function renderCalendar() {
 
 function renderMonthGrid() {
     const { year, month } = State.calendar;
+    const cal = State.calendar;
     $('cal-title').textContent = `${year} 年 ${month + 1} 月`;
 
     const first = new Date(year, month, 1);
@@ -1247,6 +1257,11 @@ function renderMonthGrid() {
     const visible = getVisibleTodos();
     const byDate = {};
     visible.forEach(t => { if (t.date) (byDate[t.date] = byDate[t.date] || []).push(t); });
+    const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const monthCount = visible.filter(t => t.date && t.date.startsWith(monthPrefix)).length;
+    const sumEl = $('cal-summary');
+    if (sumEl) sumEl.textContent = `本月 ${monthCount} 条 · 筛选后共 ${visible.length} 条`;
+    if (!cal.allExpanded) cal.allExpanded = {};
 
     const prevDays = new Date(year, month, 0).getDate();
     const cells = [];
@@ -1261,14 +1276,30 @@ function renderMonthGrid() {
     cells.forEach(c => {
         const isToday = c.date === today;
         const tasks = c.date ? (byDate[c.date] || []) : [];
-        const shown = tasks.slice(0, 3);
+        const expanded = !!(c.date && cal.allExpanded[c.date]);
+        const shown = expanded ? tasks : tasks.slice(0, 3);
+        const rest = tasks.length - shown.length;
+        let more = '';
+        if (rest > 0) more = `<div class="cal-more" data-more="${c.date}" title="展开当天全部 ${tasks.length} 条">+${rest} 更多</div>`;
+        else if (expanded && tasks.length > 3) more = `<div class="cal-more" data-more="${c.date}">收起</div>`;
         html += `<div class="cal-cell ${c.other ? 'other-month' : ''} ${isToday ? 'today' : ''}" data-date="${c.date || ''}">
             <span class="cal-daynum">${c.date ? c.d : ''}</span>
             ${shown.map(t => `<div class="cal-task pr-${t.priority} ${t.status === 'completed' ? 'completed' : ''}" draggable="true" data-id="${t.id}" title="${escapeHtml(t.content)}">${escapeHtml(t.content)}</div>`).join('')}
-            ${tasks.length > 3 ? `<div class="cal-more">+${tasks.length - 3} 更多</div>` : ''}
+            ${more}
         </div>`;
     });
     grid.innerHTML = html;
+
+    // 「+N 更多」展开 / 收起（否则一天超过 3 条就永远看不到）
+    grid.querySelectorAll('.cal-more').forEach(el => {
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const d = el.dataset.more;
+            if (!d) return;
+            cal.allExpanded[d] = !cal.allExpanded[d];
+            renderMonthGrid();
+        });
+    });
 
     // 点击打开 + 拖拽改期
     grid.querySelectorAll('.cal-task').forEach(el => {
@@ -1309,6 +1340,9 @@ function renderWeekTimeline() {
     const visible = getVisibleTodos();
     const byDate = {};
     visible.forEach(t => { if (t.date && t.date >= days[0] && t.date <= days[6]) (byDate[t.date] = byDate[t.date] || []).push(t); });
+    const weekCount = Object.values(byDate).reduce((n, arr) => n + arr.length, 0);
+    const sumEl = $('cal-summary');
+    if (sumEl) sumEl.textContent = `本周 ${weekCount} 条 · 筛选后共 ${visible.length} 条`;
 
     const WD = ['一', '二', '三', '四', '五', '六', '日'];
     const H0 = WT.h0, H1 = WT.h1, HH = WT.hourh, slots = H1 - H0;
@@ -1666,6 +1700,9 @@ function syncFilterUI() {
     $('filter-end').value = State.filters.end;
     const cf = $('filter-created-from'), ct = $('filter-created-to');
     const df = $('filter-completed-from'), dt = $('filter-completed-to');
+    const sf = $('filter-startfrom'), st = $('filter-startto');
+    if (sf) sf.value = State.filters.startFrom || '';
+    if (st) st.value = State.filters.startTo || '';
     if (cf) cf.value = State.filters.createdFrom || '';
     if (ct) ct.value = State.filters.createdTo || '';
     if (df) df.value = State.filters.completedFrom || '';
@@ -1676,7 +1713,7 @@ function syncFilterUI() {
 }
 // 老版本保存的筛选缺新字段，应用时补默认值，避免 undefined 进比较
 function normalizeFilters(f) {
-    const base = { search: '', status: 'all', priority: 'all', tag: '', start: '', end: '', createdFrom: '', createdTo: '', completedFrom: '', completedTo: '', archived: false, hideUnstarted: false };
+    const base = { search: '', status: 'all', priority: 'all', tag: '', start: '', end: '', startFrom: '', startTo: '', createdFrom: '', createdTo: '', completedFrom: '', completedTo: '', archived: false, hideUnstarted: false };
     return { ...base, ...(f || {}) };
 }
 
@@ -2337,6 +2374,8 @@ function bindEvents() {
         'filter-priority': 'priority',
         'filter-start': 'start',
         'filter-end': 'end',
+        'filter-startfrom': 'startFrom',
+        'filter-startto': 'startTo',
         'filter-created-from': 'createdFrom',
         'filter-created-to': 'createdTo',
         'filter-completed-from': 'completedFrom',

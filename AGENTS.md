@@ -86,7 +86,7 @@ backups/          # 每日备份 todo-backup-YYYY-MM-DD.json，保留 7 天（�
 - **重复任务**：`setStatus('completed')` 时 `spawnRecurring()` 生成下一周期；用 `recurPrevId` 去重（完成→重开→再完成不会重复生成）。
 - **完成度**：`progress`（0~100）。展示层统一走 `taskProgress(t)`（结办=100、非在办=0、在办取 `clampProgress(progress)`），卡片/看板用 `progressBarHtml()` 渲染，`bindProgressBar()` 支持点击+拖动轨道改值（拖动期间只改 DOM，松手 `setTaskProgress(id,pct,{silent:true})` 落库）；编辑框 `#f-progress`(range)/`#f-progress-num`/预设按钮由 `setModalProgress()` 三向同步。`setStatus` 结办置 100、改回待办置 0，复制/重复生成重置 0。
 - **进度流水 `progressLog`**：`[{d:'YYYY-MM-DD', p:0~100}]`，由 `logProgressChange(t, pct, day?)` 在「改进度条 / 弹窗存盘 / 结办 / 批量改状态」时写入（同一天覆盖当天那条）。用途是日报判定「当天有没有实际进展」——见 12.2。CSV 里用紧凑写法 `2026-10-21:20|2026-10-26:80`。
-- **筛选**：`State.filters` 字段 `search/status/priority/tag/start/end/createdFrom/createdTo/completedFrom/completedTo/archived/hideUnstarted`。标签是**自由输入框 + datalist 候选**（不是下拉），按逗号/空格分词、词间取交集、词内是「包含」匹配（`all` 视为空）。创建/完成时间按**本地日**比较（`tsDay`），完成时间筛只命中已完成的。`normalizeFilters()` 给老版本 savedFilters 补默认值。
+- **筛选**：`State.filters` 字段 `search/status/priority/tag/start/end/startFrom/startTo/createdFrom/createdTo/completedFrom/completedTo/archived/hideUnstarted`。标签是**自由输入框 + datalist 候选**（不是下拉），按逗号/空格分词、词间取交集、词内是「包含」匹配（`all` 视为空）。截止日期筛 `date`，开始日期筛 `startDate`（没设开始日期的不参与），创建/完成时间按**本地日**比较（`tsDay`），完成时间筛只命中已完成的。`normalizeFilters()` 给老版本 savedFilters 补默认值。
 - **标签体系**：`TAG_RULES`（业务域最多 2 + 事务类型最多 1）+ `suggestTags(content, pool)`。`pool` 传 `allTags()` 时只认已有标签（用户可自建新标签，内容含该词即命中）；池为空则退回内置规则表。任务弹窗输入内容时给出可点选的 `#tag-suggest` 建议，保存时按 `settings.autoTag` 自动补；设置页「给全部任务补齐」批量补空标签。
 - 关键工具：`todayISO()=localISO(new Date())`（**本地日期，勿用 toISOString 取日期**）；`tsDay(ts)` 把时间戳按本地日归日（统计分组用）。
 - 快捷键汇总：`Ctrl+K` 面板 / `Ctrl+Shift+Space` 录入 / `Ctrl+N` 新建 / `Ctrl+F` 搜索 / `Esc` 关弹窗 / 任务框内 `Ctrl+Enter` 保存。
@@ -94,7 +94,7 @@ backups/          # 每日备份 todo-backup-YYYY-MM-DD.json，保留 7 天（�
 ---
 
 ## 7. 已实现功能清单
-多清单(颜色) · 列表/看板(拖拽改状态)/日历(月+周时间块拖拽) · 仪表盘图表(优先/趋势/柱/标签/效率) · 日报(生成/编辑/导出，纯文本工作日志 / Markdown 汇总两种格式，只收当天有进展的在办) · 标签(体系化 + 按内容自动识别) · 子任务 · 在办任务完成度百分比(进度条/滑块/预设 + 进度流水) · 重复(日/周/月/自定义) · 到期提醒+每日提醒(系统通知) · 搜索(含拼音首字母)+高级筛选(状态/优先级/标签自由输入/截止·创建·完成三组时间范围)+保存筛选 · 批量操作 · 导入导出(json/csv/txt/md，导出可选范围与字段列，CSV 表头与导入模板一致可直接回导) · 创建/完成时间可手改 · 数据加密 · 备份/恢复(每日+手动) · 单实例锁 · 命令面板+快捷录入(全局快捷键) · 一键自动排程 · 开始/截止双日期 · 深浅色主题 · 紧凑模式 · 列表手动拖拽排序(仅 sort=manual 且非多选时) · 双击任务卡片编辑。
+多清单(颜色) · 列表/看板(拖拽改状态)/日历(月+周时间块拖拽) · 仪表盘图表(优先/趋势/柱/标签/效率) · 日报(生成/编辑/导出，纯文本工作日志 / Markdown 汇总两种格式，只收当天有进展的在办) · 标签(体系化 + 按内容自动识别) · 子任务 · 在办任务完成度百分比(进度条/滑块/预设 + 进度流水) · 重复(日/周/月/自定义) · 到期提醒+每日提醒(系统通知) · 搜索(含拼音首字母)+高级筛选(状态/优先级/标签自由输入/截止·开始·创建·完成四组时间范围)+保存筛选 · 批量操作 · 导入导出(json/csv/txt/md，导出可选范围与字段列，CSV 表头与导入模板一致可直接回导) · 创建/完成时间可手改 · 数据加密 · 备份/恢复(每日+手动) · 单实例锁 · 命令面板+快捷录入(全局快捷键) · 一键自动排程 · 开始/截止双日期 · 深浅色主题 · 紧凑模式 · 列表手动拖拽排序(仅 sort=manual 且非多选时) · 双击任务卡片编辑。
 
 ---
 
@@ -181,6 +181,7 @@ backups/          # 每日备份 todo-backup-YYYY-MM-DD.json，保留 7 天（�
 - 导出弹窗：范围（当前筛选/全部）× 格式（csv/json/txt/md）× 字段勾选（默认全部，`content` 锁定必选，选择记在 `settings.exportColumns`）。TXT/MD 忽略列选择，固定输出全部字段。
 - 归一化必须能吃回自己导出的内容：`normalizeTodo` / `normalize_todo` 支持 `archived/pinned` 的 `true|false|1|0|是`、`repeat` 的 JSON 或 `daily:2`、`subtasks` 的 JSON 数组或 `a|b` 字符串、`progressLog` 的 JSON 数组或 `2026-10-21:20|2026-10-26:80`、`order` 数字。CSV 带 UTF-8 BOM，解析前先 strip，否则首列表头会变成 `\uFEFFcontent`。
 - 时间字段：任务弹窗可改「创建时间 / 完成时间」（`datetime-local`），`isoToLocalInput` / `localInputToIso` 做 ISO(UTC) ↔ 本地互转，落库仍是 ISO 字符串。
+- **日历数量口径**：日历（月/周）与列表共用 `getVisibleTodos()`，但日历只按任务的 `date`（截止日期）落到当前月/周内的格子，所以「日历条数 < 列表条数」是正常的。`#cal-summary` 会显示「本月/本周 N 条 · 全部 M 条」说明口径；月视图一天超过 3 条时显示「+N 更多」，点击展开/收起（展开状态存 `State.calendar.allExpanded[date]`）。
 
 ---
 

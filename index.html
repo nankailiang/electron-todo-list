@@ -200,6 +200,14 @@
                             </div>
                         </div>
                         <div>
+                            <label class="form-label">开始日期</label>
+                            <div class="range-row">
+                                <input type="date" id="filter-startfrom" class="form-control" title="开始日期从">
+                                <span class="range-sep">~</span>
+                                <input type="date" id="filter-startto" class="form-control" title="开始日期到">
+                            </div>
+                        </div>
+                        <div>
                             <label class="form-label">创建时间</label>
                             <div class="range-row">
                                 <input type="date" id="filter-created-from" class="form-control" title="创建时间从">
@@ -270,6 +278,7 @@
                     <div class="calendar-head">
                         <button class="btn btn-icon btn-ghost" id="cal-prev"><svg class="icon"><use href="#i-chevron-left"/></svg></button>
                         <h3 id="cal-title"></h3>
+                        <span class="cal-summary" id="cal-summary"></span>
                         <button class="btn btn-icon btn-ghost" id="cal-next"><svg class="icon"><use href="#i-chevron-right"/></svg></button>
                         <button class="btn btn-ghost btn-sm" id="cal-today">今天</button>
                         <button class="btn btn-ghost btn-sm" id="cal-autoschedule" title="把本周未排时间的任务按优先级自动填入空闲时段"><svg class="icon"><use href="#i-refresh"/></svg> 自动排程</button>

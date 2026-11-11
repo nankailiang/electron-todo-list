@@ -456,18 +456,20 @@ input[type="color"].form-control { padding: 3px; }
 /* ==== 日历视图 ==== */
 .calendar-head { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
 .calendar-head h3 { font-size: 1.05rem; color: var(--text); font-weight: 700; }
-.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+.cal-summary { font-size: 0.76rem; color: var(--text-3); padding: 2px 8px; border-radius: 999px; background: var(--surface-3); white-space: nowrap; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
 .cal-weekday { text-align: center; font-size: 0.74rem; color: var(--text-3); padding: 8px 0; font-weight: 600; }
-.cal-cell { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); min-height: 96px; padding: 6px; display: flex; flex-direction: column; gap: 4px; transition: border-color 0.15s; }
+.cal-cell { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); min-height: 96px; min-width: 0; padding: 6px; display: flex; flex-direction: column; gap: 4px; transition: border-color 0.15s; }
 .cal-cell:hover { border-color: var(--border-strong); }
 .cal-cell.other-month { opacity: 0.38; }
 .cal-cell.today { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft), 0 0 0 3px var(--primary); background: var(--primary-soft); }
 .cal-daynum { font-size: 0.76rem; color: var(--text-2); font-weight: 700; align-self: flex-end; }
-.cal-task { font-size: 0.71rem; padding: 3px 7px; border-radius: 6px; background: var(--surface-3); color: var(--text-2); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid var(--medium); }
+.cal-task { font-size: 0.71rem; padding: 3px 7px; border-radius: 6px; background: var(--surface-3); color: var(--text-2); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid var(--medium); min-width: 0; max-width: 100%; box-sizing: border-box; }
 .cal-task.pr-high { border-left-color: var(--high); }
 .cal-task.pr-low { border-left-color: var(--low); }
 .cal-task.completed { text-decoration: line-through; opacity: 0.55; }
-.cal-more { font-size: 0.7rem; color: var(--text-3); cursor: pointer; font-weight: 500; }
+.cal-more { font-size: 0.7rem; color: var(--text-3); cursor: pointer; font-weight: 500; user-select: none; }
+.cal-more:hover { color: var(--primary); }
 
 /* ==== 空状态 ==== */
 .empty-state { text-align: center; padding: 60px 20px; color: var(--text-3); display: none; }
