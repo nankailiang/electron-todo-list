@@ -87,7 +87,8 @@ backups/          # 每日备份 todo-backup-YYYY-MM-DD.json，保留 7 天（�
 - **完成度**：`progress`（0~100）。展示层统一走 `taskProgress(t)`（结办=100、非在办=0、在办取 `clampProgress(progress)`），卡片/看板用 `progressBarHtml()` 渲染，`bindProgressBar()` 支持点击+拖动轨道改值（拖动期间只改 DOM，松手 `setTaskProgress(id,pct,{silent:true})` 落库）；编辑框 `#f-progress`(range)/`#f-progress-num`/预设按钮由 `setModalProgress()` 三向同步。`setStatus` 结办置 100、改回待办置 0，复制/重复生成重置 0。
 - **进度流水 `progressLog`**：`[{d:'YYYY-MM-DD', p:0~100}]`，由 `logProgressChange(t, pct, day?)` 在「改进度条 / 弹窗存盘 / 结办 / 批量改状态」时写入（同一天覆盖当天那条）。用途是日报判定「当天有没有实际进展」——见 12.2。CSV 里用紧凑写法 `2026-10-21:20|2026-10-26:80`。
 - **筛选**：`State.filters` 字段 `search/status/priority/tag/start/end/startFrom/startTo/createdFrom/createdTo/completedFrom/completedTo/archived/hideUnstarted`。标签是**自由输入框 + datalist 候选**（不是下拉），按逗号/空格分词、词间取交集、词内是「包含」匹配（`all` 视为空）。截止日期筛 `date`，开始日期筛 `startDate`（没设开始日期的不参与），创建/完成时间按**本地日**比较（`tsDay`），完成时间筛只命中已完成的。`normalizeFilters()` 给老版本 savedFilters 补默认值。
-- **标签体系**：`TAG_RULES`（业务域最多 2 + 事务类型最多 1）+ `suggestTags(content, pool)`。`pool` 传 `allTags()` 时只认已有标签（用户可自建新标签，内容含该词即命中）；池为空则退回内置规则表。任务弹窗输入内容时给出可点选的 `#tag-suggest` 建议，保存时按 `settings.autoTag` 自动补；设置页「给全部任务补齐」批量补空标签。
+- **标签体系**：`TAG_RULES`（业务域最多 2 + 事务类型最多 1）+ `suggestTags(content, pool)`。`pool` 传 `allTags()` 时只认已有标签（用户可自建新标签，内容含该词即命中）；池为空则退回内置规则表。任务弹窗输入内容时给出可点选的 `#tag-suggest` 建议；设置页「给全部任务补齐」批量补空标签。
+  **自动打标签只在「新建任务 + 标签框未被手动编辑过（`tagFieldDirty`）」时生效**。编辑已有任务时绝不能再按内容补标签——否则用户删掉的标签会被补回来（「删了保存不生效」），只改日期/改名也会凭空多出标签。存量任务补标签走「给全部任务补齐」按钮。
 - 关键工具：`todayISO()=localISO(new Date())`（**本地日期，勿用 toISOString 取日期**）；`tsDay(ts)` 把时间戳按本地日归日（统计分组用）。
 - 快捷键汇总：`Ctrl+K` 面板 / `Ctrl+Shift+Space` 录入 / `Ctrl+N` 新建 / `Ctrl+F` 搜索 / `Esc` 关弹窗 / 任务框内 `Ctrl+Enter` 保存。
 
