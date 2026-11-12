@@ -1,4 +1,5 @@
-// 生成主题设计图（同一骨架 × 6 套视觉语言），并离线计算 WCAG 对比度
+// 生成主题设计图（同一骨架 × 4 套视觉语言），并离线计算 WCAG 对比度
+// 01 青瓷 Celadon / 02 墨韵 Ink / 03 苹果玻璃 iOS Glass / 04 小米柔光 HyperOS Soft Glass
 const fs = require('fs');
 const path = require('path');
 
@@ -27,43 +28,7 @@ const THEMES = [
     }, extra: ''
   },
   {
-    id: 'mist', n: '02', name: '晨雾 Mist', tag: '中性 · 克制',
-    desc: '雾绿降饱和，灰调加重，几乎没有色彩情绪。长时间盯屏最不累，适合当成日常默认。',
-    vars: {
-      '--bg': '#F3F6F5', '--side-bg': '#FAFCFB', '--surface': '#FFFFFF', '--surface-2': '#F1F5F3',
-      '--border': '#E2E8E5', '--text': '#1C2421', '--text-2': '#566159', '--text-3': '#8B968F',
-      '--primary': '#5C8D77', '--primary-btn': '#4A7C66', '--primary-soft': '#EBF2EE',
-      '--primary-text': '#3D6952', '--on-solid': '#FFFFFF',
-      '--high-bg': '#FBEDEA', '--high-fg': '#A9432F', '--med-bg': '#FBF3E2', '--med-fg': '#8A6416',
-      '--low-bg': '#EEF2F0', '--low-fg': '#5D6B62', '--ok-bg': '#EAF3E6', '--ok-fg': '#46702B',
-      '--danger-fg': '#B0413A',
-      '--r-card': '14px', '--r-btn': '10px', '--r-input': '10px', '--r-sm': '8px', '--r-logo': '8px',
-      '--shadow-card': '0 1px 3px rgba(28,36,33,.05)',
-      '--nav-bg': 'rgba(255,255,255,.86)',
-      '--font': '"Microsoft YaHei UI","PingFang SC","Segoe UI",system-ui,sans-serif',
-      '--font-head': 'inherit',
-    }, extra: ''
-  },
-  {
-    id: 'sand', n: '03', name: '暖砂 Sand', tag: '暖调 · 大圆角',
-    desc: '燕麦底配陶土橙，纸感、温度感强，圆角再放大一档。适合不追求工具冷感、希望界面有「手感」的人。',
-    vars: {
-      '--bg': '#F7F1E6', '--side-bg': '#F2EBDD', '--surface': '#FFFCF6', '--surface-2': '#F3EDE0',
-      '--border': '#E9DECC', '--text': '#342A20', '--text-2': '#7A6955', '--text-3': '#A5947E',
-      '--primary': '#B4653A', '--primary-btn': '#A4552C', '--primary-soft': '#F7E8DC',
-      '--primary-text': '#97502A', '--on-solid': '#FFFBF5',
-      '--high-bg': '#F8E2D5', '--high-fg': '#A34A24', '--med-bg': '#F8EEDA', '--med-fg': '#86601A',
-      '--low-bg': '#EEE8DA', '--low-fg': '#6B6252', '--ok-bg': '#E9F0DC', '--ok-fg': '#4F6E2E',
-      '--danger-fg': '#A83E30',
-      '--r-card': '18px', '--r-btn': '12px', '--r-input': '12px', '--r-sm': '10px', '--r-logo': '10px',
-      '--shadow-card': '0 2px 8px rgba(122,105,85,.07)',
-      '--nav-bg': 'rgba(255,252,246,.90)',
-      '--font': '"Microsoft YaHei UI","PingFang SC","Segoe UI",system-ui,sans-serif',
-      '--font-head': 'inherit',
-    }, extra: ''
-  },
-  {
-    id: 'ink', n: '04', name: '墨韵 Ink', tag: '中式 · 宣纸朱砂',
+    id: 'ink', n: '02', name: '墨韵 Ink', tag: '中式 · 宣纸朱砂',
     desc: '宣纸底、墨色字、朱砂点缀，标题换衬线体，圆角收到 4px。文气足，适合当「写字的地方」而不是「软件」。',
     vars: {
       '--bg': '#F5F1E7', '--side-bg': '#F0EBDF', '--surface': '#FFFDF7', '--surface-2': '#F3EEE2',
@@ -89,123 +54,190 @@ const THEMES = [
 `
   },
   {
-    id: 'graphite', n: '05', name: '石墨 Graphite', tag: '极简 · 高密度',
-    desc: '冷灰中性色 + 单一电光蓝，圆角 4px，去掉全部阴影，只留 1px 描边。信息密度最高，最像专业工具。',
+    id: 'iosglass', n: '03', name: '苹果玻璃 iOS Glass', tag: 'Glassmorphism · 液态玻璃',
+    desc: '真正的玻璃拟态：底层是弥散的蓝粉绿光斑，界面是一层层半透明毛玻璃浮在上面——侧栏、卡片、底栏都能透出后面的光，边缘有一道细高光。这是 iOS 26 液态玻璃的语言。',
     vars: {
-      '--bg': '#F6F7F9', '--side-bg': '#FBFBFC', '--surface': '#FFFFFF', '--surface-2': '#F1F3F5',
-      '--border': '#E3E6EA', '--text': '#0F1216', '--text-2': '#545C66', '--text-3': '#8A929C',
-      '--primary': '#2563EB', '--primary-btn': '#1D4ED8', '--primary-soft': '#EDF2FE',
-      '--primary-text': '#1D4ED8', '--on-solid': '#FFFFFF',
-      '--high-bg': '#FDECEC', '--high-fg': '#C02B2B', '--med-bg': '#FFF4DF', '--med-fg': '#8A5C00',
-      '--low-bg': '#EFF1F4', '--low-fg': '#5A626C', '--ok-bg': '#E8F3EC', '--ok-fg': '#2C6B45',
-      '--danger-fg': '#C02B2B',
-      '--r-card': '4px', '--r-btn': '4px', '--r-input': '4px', '--r-sm': '4px', '--r-logo': '5px',
-      '--shadow-card': 'none',
-      '--nav-bg': 'rgba(255,255,255,.94)',
-      '--font': '"Microsoft YaHei UI","PingFang SC","Segoe UI",system-ui,sans-serif',
-      '--font-head': 'inherit',
-    },
-    extra: `
-.t-graphite .task{padding:10px 13px}
-.t-graphite .tasks{gap:6px}
-.t-graphite .bar{gap:6px}
-.t-graphite .tb{padding-bottom:14px}
-.t-graphite .task h4{font-weight:600;margin-bottom:6px}
-.t-graphite .chip{border-radius:3px;padding:5px 9px}
-.t-graphite .nb.on{background:var(--primary-btn);border-radius:4px}
-.t-graphite .brand i{display:none}
-`
-  },
-  {
-    id: 'midnight', n: '06', name: '深夜靛 Midnight', tag: '深色 · 玻璃质感',
-    desc: '不是纯黑，是带蓝的墨靛底，青色作唯一亮色，配发光描边和半透明面板。夜里用最舒服，也最有「工作台」氛围。',
-    vars: {
-      '--bg': '#0E1016', '--side-bg': '#12151D', '--surface': '#171B24', '--surface-2': '#1D222D',
-      '--border': '#262C39', '--text': '#E9ECF2', '--text-2': '#9BA4B6', '--text-3': '#6B7488',
-      '--primary': '#4CC9E8', '--primary-btn': '#3FC9E0', '--primary-soft': '#1B2C33',
-      '--primary-text': '#7DDCF1', '--on-solid': '#07161B',
-      '--high-bg': '#3C282F', '--high-fg': '#FF9B9B', '--med-bg': '#383024', '--med-fg': '#F5C46B',
-      '--low-bg': '#292E38', '--low-fg': '#A9B2C4', '--ok-bg': '#203423', '--ok-fg': '#8FDB6B',
-      '--danger-fg': '#FF8F8F',
-      '--r-card': '12px', '--r-btn': '9px', '--r-input': '9px', '--r-sm': '8px', '--r-logo': '8px',
-      '--shadow-card': '0 1px 0 rgba(255,255,255,.03)',
-      '--nav-bg': 'rgba(23,27,36,.86)',
-      '--font': '"Microsoft YaHei UI","PingFang SC","Segoe UI",system-ui,sans-serif',
-      '--font-head': 'inherit',
-    },
-    extra: `
-.t-midnight .screen{background-image:radial-gradient(760px 380px at 80% -8%, rgba(63,201,224,.13), transparent 68%)}
-.t-midnight .btn-p{box-shadow:0 0 0 1px rgba(63,201,224,.30), 0 8px 20px -8px rgba(63,201,224,.55)}
-.t-midnight .task{background-image:linear-gradient(180deg, rgba(255,255,255,.02), transparent)}
-.t-midnight .nav{box-shadow:0 10px 32px -12px rgba(0,0,0,.9), 0 0 0 1px rgba(255,255,255,.04)}
-.t-midnight .nb.on{background:var(--primary-btn);color:var(--on-solid);box-shadow:0 4px 14px -4px rgba(63,201,224,.6)}
-.t-midnight .logo{color:#07161B}
-`
-  },
-  {
-    id: 'ios', n: '07', name: '苹果 iOS', tag: '系统原生 · 分组列表',
-    desc: '照 iOS 的分组列表做：系统灰底、纯白卡片、细分隔线、大标题、蓝色 tint，底栏换成贴底 tab bar。没有一处装饰是多余的，也不抢注意力。',
-    vars: {
-      '--bg': '#F2F2F7', '--side-bg': '#F9F9FB', '--surface': '#FFFFFF', '--surface-2': '#F2F2F7',
-      '--border': '#E3E3E8', '--text': '#000000', '--text-2': '#6B6B70', '--text-3': '#8E8E93',
-      '--primary': '#007AFF', '--primary-btn': '#0064DE', '--primary-soft': '#EAF2FF',
-      '--primary-text': '#0058C7', '--on-solid': '#FFFFFF',
-      '--high-bg': '#FFE9E7', '--high-fg': '#C4302B', '--med-bg': '#FFF3DF', '--med-fg': '#96690B',
-      '--low-bg': '#EFEFF4', '--low-fg': '#5C5C66', '--ok-bg': '#E6F7EC', '--ok-fg': '#24803E',
-      '--danger-fg': '#C4302B',
-      '--r-card': '12px', '--r-btn': '10px', '--r-input': '10px', '--r-sm': '8px', '--r-logo': '7px',
-      '--shadow-card': '0 1px 2px rgba(0,0,0,.04)',
-      '--nav-bg': 'rgba(255,255,255,.94)',
+      '--bg': '#EDF1F9', '--side-bg': 'rgba(255,255,255,.42)', '--surface': '#F4F7FC', '--surface-2': 'rgba(255,255,255,.34)',
+      '--border': 'rgba(255,255,255,.62)', '--text': '#14161C', '--text-2': '#4A4F5A', '--text-3': '#7C8493',
+      '--primary': '#007AFF', '--primary-btn': '#0A66D6', '--primary-soft': 'rgba(0,122,255,.12)',
+      '--primary-text': '#0A5FC8', '--on-solid': '#FFFFFF',
+      '--high-bg': 'rgba(255,90,80,.14)', '--high-fg': '#B8302A', '--med-bg': 'rgba(255,159,10,.16)', '--med-fg': '#8A5B00',
+      '--low-bg': 'rgba(120,130,150,.14)', '--low-fg': '#565C68', '--ok-bg': 'rgba(48,190,95,.16)', '--ok-fg': '#1F7A42',
+      '--danger-fg': '#B8302A',
+      '--glass': 'rgba(255,255,255,.46)',
+      '--glass-2': 'rgba(255,255,255,.32)',
+      '--glass-line': 'rgba(255,255,255,.82)',
+      '--glass-blur': 'blur(26px) saturate(180%)',
+      '--r-card': '22px', '--r-btn': '14px', '--r-input': '14px', '--r-sm': '12px', '--r-logo': '9px',
+      '--shadow-card': '0 10px 30px -14px rgba(24,44,88,.22)',
+      '--nav-bg': 'rgba(255,255,255,.55)',
       '--font': '-apple-system,"SF Pro Text","PingFang SC","Microsoft YaHei UI",system-ui,sans-serif',
       '--font-head': 'inherit',
     },
     extra: `
-.t-ios .tb{padding-bottom:14px}
-.t-ios .tb h3{font-size:25px;font-weight:800;letter-spacing:-.7px}
-.t-ios .search{background:#EFEFF4;border-color:transparent;border-radius:10px}
-.t-ios .task{border-color:#E3E3E8;border-left-color:var(--st);box-shadow:none}
-.t-ios .tasks{gap:8px}
-.t-ios .prog{height:3px}
-.t-ios .li{border-radius:8px;padding:7px 9px}
-.t-ios .li.active{background:#E9E9EF;color:#000;font-weight:600}
-.t-ios .li.active em{color:#8E8E93}
-.t-ios .logo{background:linear-gradient(180deg,#5AC8FA,#007AFF)}
-.t-ios .nav{left:226px;right:0;width:auto;transform:none;border-radius:0;border:none;border-top:1px solid #D8D8DE;box-shadow:0 -1px 0 rgba(0,0,0,.03);background:var(--nav-bg);padding:5px 8px 9px;justify-content:space-around}
-.t-ios .nb{flex-direction:column;gap:1px;padding:5px 10px;border-radius:8px;font-size:10px;font-weight:500}
-.t-ios .nb .ic{width:17px;height:17px}
-.t-ios .nb.on{background:transparent;color:var(--primary);font-weight:600;box-shadow:none}
+/* 底层：明确的彩色光球，玻璃才有东西可透 */
+.screen.t-iosglass{
+  background:linear-gradient(150deg,#E9EFFB 0%,#F4EDFA 48%,#E9F6F1 100%);
+}
+.screen.t-iosglass::before,
+.screen.t-iosglass::after{
+  content:"";position:absolute;border-radius:50%;z-index:0;pointer-events:none;
+}
+.screen.t-iosglass::before{
+  width:720px;height:720px;left:18%;top:-180px;
+  background:radial-gradient(circle at 50% 50%, rgba(96,150,255,.60), rgba(96,150,255,0) 70%);
+}
+.screen.t-iosglass::after{
+  width:660px;height:660px;left:44%;bottom:-150px;
+  background:radial-gradient(circle at 50% 50%, rgba(255,138,188,.52), rgba(255,138,188,0) 70%);
+}
+.t-iosglass .sb,.t-iosglass .mn{position:relative;z-index:1}
+/* 侧栏玻璃 */
+.t-iosglass .sb{
+  background:var(--glass-2);
+  backdrop-filter:blur(30px) saturate(180%);
+  -webkit-backdrop-filter:blur(30px) saturate(180%);
+  border-right:1px solid rgba(255,255,255,.55);
+  box-shadow:inset -1px 0 0 rgba(255,255,255,.5);
+}
+/* 卡片玻璃 */
+.t-iosglass .task{
+  background:var(--glass);
+  backdrop-filter:var(--glass-blur);
+  -webkit-backdrop-filter:var(--glass-blur);
+  border:1px solid var(--glass-line);
+  border-left:3px solid var(--st);
+  box-shadow:
+    0 10px 30px -14px rgba(24,44,88,.22),
+    inset 0 1px 0 rgba(255,255,255,.9),
+    inset 0 -1px 0 rgba(255,255,255,.35);
+}
+.t-iosglass .tasks{gap:11px}
+.t-iosglass .tb{padding-bottom:16px}
+.t-iosglass .tb h3{font-size:26px;font-weight:800;letter-spacing:-.8px}
+.t-iosglass .search,
+.t-iosglass .chip{
+  background:rgba(255,255,255,.45);
+  backdrop-filter:blur(18px) saturate(160%);
+  -webkit-backdrop-filter:blur(18px) saturate(160%);
+  border:1px solid rgba(255,255,255,.7);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.85);
+}
+.t-iosglass .search{border-radius:14px}
+.t-iosglass .chip{border-radius:14px}
+.t-iosglass .btn-p{
+  background:linear-gradient(180deg,#1B86F2,#0A66D6);
+  box-shadow:0 8px 20px -8px rgba(10,102,214,.6), inset 0 1px 0 rgba(255,255,255,.35);
+}
+.t-iosglass .li{border-radius:11px}
+.t-iosglass .li.active{background:rgba(255,255,255,.6);color:var(--text);box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 2px 8px -4px rgba(24,44,88,.2)}
+.t-iosglass .li.active em{color:var(--text-2)}
+.t-iosglass .logo{background:linear-gradient(180deg,#5AC8FA,#007AFF);box-shadow:0 4px 12px -4px rgba(0,122,255,.6), inset 0 1px 0 rgba(255,255,255,.5)}
+.t-iosglass .prog{background:rgba(255,255,255,.55);box-shadow:inset 0 0 0 1px rgba(255,255,255,.6)}
+.t-iosglass .nav{
+  left:226px;right:0;width:auto;transform:none;border-radius:0;
+  border:none;border-top:1px solid rgba(255,255,255,.65);
+  background:var(--nav-bg);
+  backdrop-filter:blur(34px) saturate(190%);
+  -webkit-backdrop-filter:blur(34px) saturate(190%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.85);
+  padding:5px 8px 9px;justify-content:space-around;
+}
+.t-iosglass .nb{flex-direction:column;gap:1px;padding:5px 10px;border-radius:10px;font-size:10px;font-weight:500;color:var(--text-2)}
+.t-iosglass .nb .ic{width:18px;height:18px}
+.t-iosglass .nb.on{background:transparent;color:var(--primary);font-weight:600;box-shadow:none}
 `
   },
   {
-    id: 'hyper', n: '08', name: '澎湃 HyperOS', tag: '明亮卡片 · 渐变',
-    desc: '照 HyperOS 的做法：纯白卡片、24px 大圆角、蓝紫渐变按钮、悬浮胶囊底栏，卡片带一层极淡的蓝色投影，轻盈、有呼吸感。',
+    id: 'hyperglass', n: '04', name: '小米柔光 HyperOS Soft Glass', tag: '柔光玻璃 · 弥散光',
+    desc: '澎湃 OS 的路子：玻璃更白更「奶」，内芯接近实白，边缘是一圈柔和弥散的光晕而不是硬高光，投影带冷调蓝；圆角拉到 28px，整体透亮、软、有呼吸感。',
     vars: {
-      '--bg': '#F2F4F8', '--side-bg': '#FAFBFD', '--surface': '#FFFFFF', '--surface-2': '#F1F4F9',
-      '--border': '#E7ECF3', '--text': '#0D1220', '--text-2': '#5A6472', '--text-3': '#939CAA',
-      '--primary': '#3482FF', '--primary-btn': '#2A6BEA', '--primary-soft': '#ECF2FF',
+      '--bg': '#F1F4FA', '--side-bg': 'rgba(255,255,255,.62)', '--surface': '#F4F7FC', '--surface-2': 'rgba(255,255,255,.72)',
+      '--border': 'rgba(255,255,255,.9)', '--text': '#0F1522', '--text-2': '#4E5A6E', '--text-3': '#8794A8',
+      '--primary': '#3482FF', '--primary-btn': '#2A6BEA', '--primary-soft': 'rgba(52,130,255,.12)',
       '--primary-text': '#1B4FD1', '--on-solid': '#FFFFFF',
-      '--high-bg': '#FFEDED', '--high-fg': '#C62F2F', '--med-bg': '#FFF3E0', '--med-fg': '#96601A',
-      '--low-bg': '#EFF2F7', '--low-fg': '#5A6472', '--ok-bg': '#E8F7EF', '--ok-fg': '#1F7A4D',
-      '--danger-fg': '#C62F2F',
-      '--r-card': '24px', '--r-btn': '16px', '--r-input': '18px', '--r-sm': '12px', '--r-logo': '12px',
-      '--shadow-card': '0 6px 20px -12px rgba(45,90,190,.20)',
-      '--nav-bg': 'rgba(255,255,255,.96)',
+      '--high-bg': 'rgba(255,80,80,.13)', '--high-fg': '#BE2F2F', '--med-bg': 'rgba(255,140,30,.16)', '--med-fg': '#8A5510',
+      '--low-bg': 'rgba(120,140,170,.14)', '--low-fg': '#556074', '--ok-bg': 'rgba(30,170,110,.15)', '--ok-fg': '#1B6E48',
+      '--danger-fg': '#BE2F2F',
+      '--glass': 'rgba(255,255,255,.78)',
+      '--glass-2': 'rgba(255,255,255,.58)',
+      '--glass-line': 'rgba(255,255,255,.98)',
+      '--glass-blur': 'blur(30px) saturate(150%)',
+      '--r-card': '28px', '--r-btn': '18px', '--r-input': '20px', '--r-sm': '14px', '--r-logo': '12px',
+      '--shadow-card': '0 12px 34px -18px rgba(52,110,200,.30)',
+      '--nav-bg': 'rgba(255,255,255,.78)',
       '--font': '"MiSans","PingFang SC","Microsoft YaHei UI",system-ui,sans-serif',
       '--font-head': 'inherit',
     },
     extra: `
-.t-hyper .btn-p{background:linear-gradient(135deg,#3C86FF,#1B4FD1);box-shadow:0 8px 20px -8px rgba(43,106,234,.55);border-radius:16px;padding:10px 17px}
-.t-hyper .tb h3{font-size:22px;letter-spacing:-.3px}
-.t-hyper .task{border-color:rgba(231,236,243,.9);border-left-color:var(--st);box-shadow:0 6px 20px -12px rgba(45,90,190,.22)}
-.t-hyper .tasks{gap:10px}
-.t-hyper .search{background:#F1F4F9;border-color:transparent;border-radius:18px;padding:10px 14px}
-.t-hyper .chip{background:#F1F4F9;border-color:transparent;border-radius:14px;padding:9px 13px}
-.t-hyper .nav{padding:6px;border-radius:26px;box-shadow:0 14px 32px -14px rgba(30,60,120,.40)}
-.t-hyper .nb{border-radius:20px;padding:8px 15px}
-.t-hyper .nb.on{background:linear-gradient(135deg,#3C86FF,#1B4FD1);box-shadow:0 6px 14px -6px rgba(43,106,234,.6)}
-.t-hyper .li.active{background:#ECF2FF;border-radius:12px}
-.t-hyper .logo{background:linear-gradient(135deg,#4A8CFF,#1B4FD1);border-radius:10px}
-.t-hyper .prog{height:5px;background:#E7EEFB}
+/* 底层柔光：大范围、低强度、冷调，只为「亮」不为「透」 */
+.screen.t-hyperglass{
+  background:linear-gradient(180deg,#F8FBFF 0%,#EDF3FC 100%);
+}
+.screen.t-hyperglass::before,
+.screen.t-hyperglass::after{
+  content:"";position:absolute;border-radius:50%;z-index:0;pointer-events:none;
+}
+.screen.t-hyperglass::before{
+  width:900px;height:900px;left:14%;top:-300px;
+  background:radial-gradient(circle at 50% 50%, rgba(120,172,255,.32), rgba(120,172,255,0) 72%);
+}
+.screen.t-hyperglass::after{
+  width:760px;height:760px;left:50%;bottom:-200px;
+  background:radial-gradient(circle at 50% 50%, rgba(170,150,255,.24), rgba(170,150,255,0) 72%);
+}
+.t-hyperglass .sb,.t-hyperglass .mn{position:relative;z-index:1}
+/* 侧栏：更白，柔光边 */
+.t-hyperglass .sb{
+  background:var(--glass-2);
+  backdrop-filter:blur(34px) saturate(150%);
+  -webkit-backdrop-filter:blur(34px) saturate(150%);
+  border-right:1px solid rgba(255,255,255,.85);
+}
+/* 卡片：内芯近实白 + 弥散蓝光晕 */
+.t-hyperglass .task{
+  background:var(--glass);
+  backdrop-filter:var(--glass-blur);
+  -webkit-backdrop-filter:var(--glass-blur);
+  border:1px solid var(--glass-line);
+  border-left:3px solid var(--st);
+  box-shadow:
+    0 14px 36px -20px rgba(52,110,200,.38),
+    0 4px 14px -8px rgba(52,110,200,.16),
+    inset 0 1px 0 rgba(255,255,255,1);
+}
+.t-hyperglass .tasks{gap:12px}
+.t-hyperglass .task h4{font-weight:600}
+.t-hyperglass .tb h3{font-size:22px;letter-spacing:-.3px}
+.t-hyperglass .search,
+.t-hyperglass .chip{
+  background:rgba(255,255,255,.75);
+  backdrop-filter:blur(20px) saturate(140%);
+  -webkit-backdrop-filter:blur(20px) saturate(140%);
+  border:1px solid rgba(255,255,255,.95);
+  box-shadow:0 4px 14px -10px rgba(52,110,200,.35);
+}
+.t-hyperglass .search{border-radius:20px;padding:10px 15px}
+.t-hyperglass .chip{border-radius:16px;padding:9px 13px}
+.t-hyperglass .btn-p{
+  background:linear-gradient(135deg,#4A8CFF,#1B4FD1);
+  box-shadow:0 10px 24px -10px rgba(43,106,234,.65), inset 0 1px 0 rgba(255,255,255,.4);
+  border-radius:18px;
+}
+.t-hyperglass .li{border-radius:14px}
+.t-hyperglass .li.active{background:rgba(255,255,255,.85);color:var(--primary-text);box-shadow:0 4px 12px -6px rgba(52,110,200,.28)}
+.t-hyperglass .logo{background:linear-gradient(135deg,#63A0FF,#1B4FD1);box-shadow:0 6px 16px -6px rgba(43,106,234,.6)}
+.t-hyperglass .prog{height:5px;background:rgba(255,255,255,.9)}
+.t-hyperglass .nav{
+  padding:7px;border-radius:30px;
+  background:var(--nav-bg);
+  backdrop-filter:blur(36px) saturate(150%);
+  -webkit-backdrop-filter:blur(36px) saturate(150%);
+  border:1px solid rgba(255,255,255,.9);
+  box-shadow:0 18px 40px -18px rgba(30,60,120,.42), inset 0 1px 0 rgba(255,255,255,.9);
+}
+.t-hyperglass .nb{border-radius:22px;padding:8px 15px}
+.t-hyperglass .nb.on{background:linear-gradient(135deg,#4A8CFF,#1B4FD1);box-shadow:0 8px 18px -8px rgba(43,106,234,.7)}
 `
   },
 ];
@@ -238,7 +270,7 @@ const metrics = (t) => {
     body: cr(v['--text'], v['--surface']),
     sub: cr(v['--text-2'], v['--surface']),
     btn: cr(v['--primary-btn'], v['--on-solid']),
-    active: cr(v['--primary-text'], v['--primary-soft']),
+    active: cr(v['--primary-text'], v['--surface']),
   };
 };
 
@@ -306,7 +338,7 @@ const section = (t) => {
           <span>正文 <b>${f(m.body)}</b></span>
           <span>次要 <b>${f(m.sub)}</b></span>
           <span>主按钮 <b>${f(m.btn)}</b></span>
-          <span>选中项 <b>${f(m.active)}</b></span>
+          <span>强调字 <b>${f(m.active)}</b></span>
         </div>
       </div>
     </div>
@@ -324,7 +356,7 @@ body{background:#12141A;color:#DFE3EA;font-family:"Microsoft YaHei UI","PingFang
 .board{max-width:1232px;margin:0 auto;padding:54px 24px 90px}
 .bh{display:flex;align-items:flex-end;justify-content:space-between;gap:28px;flex-wrap:wrap}
 .bh h1{font-size:31px;font-weight:800;letter-spacing:-.6px}
-.bh .sub{color:#8A93A3;font-size:13.5px;margin-top:12px;line-height:1.75;max-width:660px}
+.bh .sub{color:#8A93A3;font-size:13.5px;margin-top:12px;line-height:1.75;max-width:700px}
 .bh .meta{font-size:12px;color:#5F6879;margin-top:14px;letter-spacing:.3px}
 .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:26px;padding-top:22px;border-top:1px solid #232833}
 .lg{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:8px 14px 8px 10px;border-radius:999px;border:1px solid #262B36;background:#191D25;color:#AEB6C4;text-decoration:none;transition:.15s}
@@ -336,7 +368,7 @@ body{background:#12141A;color:#DFE3EA;font-family:"Microsoft YaHei UI","PingFang
 .th-n{font-size:12px;font-weight:700;color:#4C5568;letter-spacing:1.5px;padding-top:5px;font-variant-numeric:tabular-nums}
 .th-name{font-size:19px;font-weight:700;letter-spacing:.2px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .th-tag{font-size:11px;font-weight:600;color:#8A93A3;border:1px solid #2B3140;border-radius:999px;padding:3px 9px;letter-spacing:.2px}
-.th-desc{font-size:13px;color:#8A93A3;margin-top:9px;line-height:1.7;max-width:640px}
+.th-desc{font-size:13px;color:#8A93A3;margin-top:9px;line-height:1.7;max-width:660px}
 .th-cr{display:flex;gap:16px;flex-wrap:wrap;margin-top:11px;font-size:11.5px;color:#66707F}
 .th-cr b{color:#B9C2D0;font-weight:600;font-variant-numeric:tabular-nums}
 .th-sw{display:flex;gap:6px;flex-shrink:0;padding-top:2px}
@@ -410,7 +442,7 @@ body{background:#12141A;color:#DFE3EA;font-family:"Microsoft YaHei UI","PingFang
 .nb.on .ic{opacity:1}
 
 /* 页脚 */
-.foot{margin-top:64px;padding-top:26px;border-top:1px solid #232833;color:#7A8395;font-size:12.5px;line-height:1.9;max-width:820px}
+.foot{margin-top:64px;padding-top:26px;border-top:1px solid #232833;color:#7A8395;font-size:12.5px;line-height:1.9;max-width:860px}
 .foot b{color:#AEB6C4;font-weight:600}
 @media (max-width:1220px){.swrap{overflow-x:auto}}
 `;
@@ -420,7 +452,7 @@ const html = `<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>知行 · 主题风格方案（8 版设计图）</title>
+<title>知行 · 主题风格方案（4 版设计图）</title>
 <style>
 ${css}
 ${THEMES.map(t => `.t-${t.id}{\n${themeVars(t)}\n}`).join('\n')}
@@ -448,8 +480,8 @@ ${THEMES.map(t => t.extra).join('\n')}
   <header class="bh">
     <div>
       <h1>知行 · 主题风格方案</h1>
-      <p class="sub">同一套界面骨架（侧栏 + 工具栏 + 任务卡 + 浮动底栏），配八种视觉语言。每版的底色、主色、圆角、阴影、字体都不同，但布局、间距、信息层级完全一致——选定后只需替换 <code>:root</code> 里那套变量。后两版（07/08）参考 iOS 与澎湃 HyperOS 的系统语言。</p>
-      <p class="meta">2026-11-12 · 8 版 · 数据为示意 · 对比度按 WCAG 2.1 实测</p>
+      <p class="sub">同一套界面骨架（侧栏 + 工具栏 + 任务卡 + 浮动底栏），四套视觉语言。01/02 保持不变；03/04 重做为两种玻璃质感——苹果的 Glassmorphism 与小米澎湃的柔光玻璃。骨架、间距、信息层级完全一致，落地只需替换 <code>:root</code> 变量。</p>
+      <p class="meta">2026-11-12 · 4 版 · 数据为示意 · 对比度按 WCAG 2.1 实测</p>
     </div>
   </header>
 
@@ -460,9 +492,9 @@ ${THEMES.map(t => t.extra).join('\n')}
   ${THEMES.map(section).join('\n')}
 
   <footer class="foot">
-    <b>怎么用：</b>选中一版后，我把它的变量写进 <code>styles.css</code> 的 <code>:root</code>，并在设置页加一个「主题风格」下拉（现有浅色/深色之外再挂这套），可随时切换、跟系统深色联动需要再做一层映射。<br>
-    <b>注意：</b>第 06 版本身就是深色，与现有深色主题会合并成一个；第 04 版用了衬线字体，若系统缺 Songti 会回退到雅黑。所有主按钮与正文对比度均 ≥ 4.5:1。<br>
-    <b>07 / 08 的额外工作量：</b>07 把底栏从「浮动胶囊」改成贴底 tab bar，08 把按钮改成渐变、卡片圆角拉到 24px——这两处不只是换变量，落地时各需改一段 CSS 骨架（约 20 行），其余仍走同一套 token。08 的 MiSans 字体需随包分发，否则回退到苹方/雅黑。
+    <b>03 与 04 的区别：</b>同样用毛玻璃，苹果这版玻璃更透（0.58 白）、边缘有一道锐利的高光、底层光斑更饱和，能明显看出「隔着玻璃」；小米这版内芯接近实白（0.80）、高光弥散成光晕、投影带冷调蓝、圆角到 28px，观感是「发亮的白」而不是「透」的玻璃。<br>
+    <b>对比度：</b>玻璃层是半透明的，这里按最暗的等效底色（近白）计算，实际显示时背景更亮、对比度只会更高，不会更低。所有主按钮与正文均 ≥ 4.5:1。<br>
+    <b>落地提醒：</b>03/04 依赖 <code>backdrop-filter</code>，WebView2 / Chromium 支持，但关闭硬件加速的老机器上会退化成纯色，需要补一层 <code>@supports not (backdrop-filter: blur(1px))</code> 的实色兜底。04 的 MiSans 需随包分发，否则回退到苹方/雅黑。
   </footer>
 </div>
 </body>
@@ -474,4 +506,4 @@ const outPath = path.join(outDir, '主题方案-2026-11-11.html');
 fs.writeFileSync(outPath, html, 'utf8');
 
 console.log('written:', outPath, (html.length / 1024).toFixed(1) + 'KB');
-THEMES.forEach(t => { const m = metrics(t); console.log(t.name.padEnd(18), '正文', f(m.body), '| 次要', f(m.sub), '| 按钮', f(m.btn), '| 选中', f(m.active)); });
+THEMES.forEach(t => { const m = metrics(t); console.log(t.name.padEnd(28), '正文', f(m.body), '| 次要', f(m.sub), '| 按钮', f(m.btn), '| 强调', f(m.active)); });
