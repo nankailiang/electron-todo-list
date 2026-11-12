@@ -1,6 +1,6 @@
 {
   "name": "zhixing",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "知行 —— 任务、日报与效率看板一体的桌面工作台（Electron）",
   "main": "main.js",
   "scripts": {

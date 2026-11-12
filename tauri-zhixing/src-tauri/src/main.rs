@@ -1318,7 +1318,7 @@ fn open_path(path: String) -> Value {
 fn get_app_info(app: AppHandle) -> Value {
     let data = data_dir(&app);
     json!({
-        "version": "1.0.0",
+        "version": env!("CARGO_PKG_VERSION"),
         "dataPath": data.join("todoList.json").to_string_lossy().to_string(),
         "userDataPath": data.to_string_lossy().to_string(),
         "backupDir": backups_dir(&app).to_string_lossy().to_string()
