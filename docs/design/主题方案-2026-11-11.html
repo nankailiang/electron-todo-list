@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>知行 · 主题风格方案（6 版设计图）</title>
+<title>知行 · 主题风格方案（8 版设计图）</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%}
@@ -301,6 +301,72 @@ body{background:#12141A;color:#DFE3EA;font-family:"Microsoft YaHei UI","PingFang
   --font: "Microsoft YaHei UI","PingFang SC","Segoe UI",system-ui,sans-serif;
   --font-head: inherit;
 }
+.t-ios{
+  --bg: #F2F2F7;
+  --side-bg: #F9F9FB;
+  --surface: #FFFFFF;
+  --surface-2: #F2F2F7;
+  --border: #E3E3E8;
+  --text: #000000;
+  --text-2: #6B6B70;
+  --text-3: #8E8E93;
+  --primary: #007AFF;
+  --primary-btn: #0064DE;
+  --primary-soft: #EAF2FF;
+  --primary-text: #0058C7;
+  --on-solid: #FFFFFF;
+  --high-bg: #FFE9E7;
+  --high-fg: #C4302B;
+  --med-bg: #FFF3DF;
+  --med-fg: #96690B;
+  --low-bg: #EFEFF4;
+  --low-fg: #5C5C66;
+  --ok-bg: #E6F7EC;
+  --ok-fg: #24803E;
+  --danger-fg: #C4302B;
+  --r-card: 12px;
+  --r-btn: 10px;
+  --r-input: 10px;
+  --r-sm: 8px;
+  --r-logo: 7px;
+  --shadow-card: 0 1px 2px rgba(0,0,0,.04);
+  --nav-bg: rgba(255,255,255,.94);
+  --font: -apple-system,"SF Pro Text","PingFang SC","Microsoft YaHei UI",system-ui,sans-serif;
+  --font-head: inherit;
+}
+.t-hyper{
+  --bg: #F2F4F8;
+  --side-bg: #FAFBFD;
+  --surface: #FFFFFF;
+  --surface-2: #F1F4F9;
+  --border: #E7ECF3;
+  --text: #0D1220;
+  --text-2: #5A6472;
+  --text-3: #939CAA;
+  --primary: #3482FF;
+  --primary-btn: #2A6BEA;
+  --primary-soft: #ECF2FF;
+  --primary-text: #1B4FD1;
+  --on-solid: #FFFFFF;
+  --high-bg: #FFEDED;
+  --high-fg: #C62F2F;
+  --med-bg: #FFF3E0;
+  --med-fg: #96601A;
+  --low-bg: #EFF2F7;
+  --low-fg: #5A6472;
+  --ok-bg: #E8F7EF;
+  --ok-fg: #1F7A4D;
+  --danger-fg: #C62F2F;
+  --r-card: 24px;
+  --r-btn: 16px;
+  --r-input: 18px;
+  --r-sm: 12px;
+  --r-logo: 12px;
+  --shadow-card: 0 6px 20px -12px rgba(45,90,190,.20);
+  --nav-bg: rgba(255,255,255,.96);
+  --font: "MiSans","PingFang SC","Microsoft YaHei UI",system-ui,sans-serif;
+  --font-head: inherit;
+}
 
 
 
@@ -330,6 +396,36 @@ body{background:#12141A;color:#DFE3EA;font-family:"Microsoft YaHei UI","PingFang
 .t-midnight .nb.on{background:var(--primary-btn);color:var(--on-solid);box-shadow:0 4px 14px -4px rgba(63,201,224,.6)}
 .t-midnight .logo{color:#07161B}
 
+
+.t-ios .tb{padding-bottom:14px}
+.t-ios .tb h3{font-size:25px;font-weight:800;letter-spacing:-.7px}
+.t-ios .search{background:#EFEFF4;border-color:transparent;border-radius:10px}
+.t-ios .task{border-color:#E3E3E8;border-left-color:var(--st);box-shadow:none}
+.t-ios .tasks{gap:8px}
+.t-ios .prog{height:3px}
+.t-ios .li{border-radius:8px;padding:7px 9px}
+.t-ios .li.active{background:#E9E9EF;color:#000;font-weight:600}
+.t-ios .li.active em{color:#8E8E93}
+.t-ios .logo{background:linear-gradient(180deg,#5AC8FA,#007AFF)}
+.t-ios .nav{left:226px;right:0;width:auto;transform:none;border-radius:0;border:none;border-top:1px solid #D8D8DE;box-shadow:0 -1px 0 rgba(0,0,0,.03);background:var(--nav-bg);padding:5px 8px 9px;justify-content:space-around}
+.t-ios .nb{flex-direction:column;gap:1px;padding:5px 10px;border-radius:8px;font-size:10px;font-weight:500}
+.t-ios .nb .ic{width:17px;height:17px}
+.t-ios .nb.on{background:transparent;color:var(--primary);font-weight:600;box-shadow:none}
+
+
+.t-hyper .btn-p{background:linear-gradient(135deg,#3C86FF,#1B4FD1);box-shadow:0 8px 20px -8px rgba(43,106,234,.55);border-radius:16px;padding:10px 17px}
+.t-hyper .tb h3{font-size:22px;letter-spacing:-.3px}
+.t-hyper .task{border-color:rgba(231,236,243,.9);border-left-color:var(--st);box-shadow:0 6px 20px -12px rgba(45,90,190,.22)}
+.t-hyper .tasks{gap:10px}
+.t-hyper .search{background:#F1F4F9;border-color:transparent;border-radius:18px;padding:10px 14px}
+.t-hyper .chip{background:#F1F4F9;border-color:transparent;border-radius:14px;padding:9px 13px}
+.t-hyper .nav{padding:6px;border-radius:26px;box-shadow:0 14px 32px -14px rgba(30,60,120,.40)}
+.t-hyper .nb{border-radius:20px;padding:8px 15px}
+.t-hyper .nb.on{background:linear-gradient(135deg,#3C86FF,#1B4FD1);box-shadow:0 6px 14px -6px rgba(43,106,234,.6)}
+.t-hyper .li.active{background:#ECF2FF;border-radius:12px}
+.t-hyper .logo{background:linear-gradient(135deg,#4A8CFF,#1B4FD1);border-radius:10px}
+.t-hyper .prog{height:5px;background:#E7EEFB}
+
 </style>
 </head>
 <body>
@@ -353,13 +449,13 @@ body{background:#12141A;color:#DFE3EA;font-family:"Microsoft YaHei UI","PingFang
   <header class="bh">
     <div>
       <h1>知行 · 主题风格方案</h1>
-      <p class="sub">同一套界面骨架（侧栏 + 工具栏 + 任务卡 + 浮动底栏），配六种视觉语言。每版的底色、主色、圆角、阴影、字体都不同，但布局、间距、信息层级完全一致——选定后只需替换 <code>:root</code> 里那套变量。</p>
-      <p class="meta">2026-11-11 · 6 版 · 数据为示意 · 对比度按 WCAG 2.1 实测</p>
+      <p class="sub">同一套界面骨架（侧栏 + 工具栏 + 任务卡 + 浮动底栏），配八种视觉语言。每版的底色、主色、圆角、阴影、字体都不同，但布局、间距、信息层级完全一致——选定后只需替换 <code>:root</code> 里那套变量。后两版（07/08）参考 iOS 与澎湃 HyperOS 的系统语言。</p>
+      <p class="meta">2026-11-12 · 8 版 · 数据为示意 · 对比度按 WCAG 2.1 实测</p>
     </div>
   </header>
 
   <nav class="legend">
-    <a class="lg" href="#t-celadon"><b style="background:#1E7F68"></b>青瓷 Celadon</a><a class="lg" href="#t-mist"><b style="background:#4A7C66"></b>晨雾 Mist</a><a class="lg" href="#t-sand"><b style="background:#A4552C"></b>暖砂 Sand</a><a class="lg" href="#t-ink"><b style="background:#A63D2F"></b>墨韵 Ink</a><a class="lg" href="#t-graphite"><b style="background:#1D4ED8"></b>石墨 Graphite</a><a class="lg" href="#t-midnight"><b style="background:#3FC9E0"></b>深夜靛 Midnight</a>
+    <a class="lg" href="#t-celadon"><b style="background:#1E7F68"></b>青瓷 Celadon</a><a class="lg" href="#t-mist"><b style="background:#4A7C66"></b>晨雾 Mist</a><a class="lg" href="#t-sand"><b style="background:#A4552C"></b>暖砂 Sand</a><a class="lg" href="#t-ink"><b style="background:#A63D2F"></b>墨韵 Ink</a><a class="lg" href="#t-graphite"><b style="background:#1D4ED8"></b>石墨 Graphite</a><a class="lg" href="#t-midnight"><b style="background:#3FC9E0"></b>深夜靛 Midnight</a><a class="lg" href="#t-ios"><b style="background:#0064DE"></b>苹果 iOS</a><a class="lg" href="#t-hyper"><b style="background:#2A6BEA"></b>澎湃 HyperOS</a>
   </nav>
 
   
@@ -1005,9 +1101,224 @@ body{background:#12141A;color:#DFE3EA;font-family:"Microsoft YaHei UI","PingFang
 </div>
 </section>
 
+<section class="theme" id="t-ios">
+  <div class="thead">
+    <div class="th-l">
+      <span class="th-n">07</span>
+      <div>
+        <div class="th-name">苹果 iOS<span class="th-tag">系统原生 · 分组列表</span></div>
+        <p class="th-desc">照 iOS 的分组列表做：系统灰底、纯白卡片、细分隔线、大标题、蓝色 tint，底栏换成贴底 tab bar。没有一处装饰是多余的，也不抢注意力。</p>
+        <div class="th-cr">
+          <span>正文 <b>21.0</b></span>
+          <span>次要 <b>5.3</b></span>
+          <span>主按钮 <b>5.4</b></span>
+          <span>选中项 <b>5.8</b></span>
+        </div>
+      </div>
+    </div>
+    <div class="th-sw"><span class="sw" style="background:#F2F2F7" title="--bg #F2F2F7"></span><span class="sw" style="background:#FFFFFF" title="--surface #FFFFFF"></span><span class="sw" style="background:#007AFF" title="--primary #007AFF"></span><span class="sw" style="background:#0064DE" title="--primary-btn #0064DE"></span><span class="sw" style="background:#000000" title="--text #000000"></span></div>
+  </div>
+  
+<div class="swrap">
+  <div class="screen t-ios">
+    <aside class="sb">
+      <div class="brand"><span class="logo"><svg class="ic"><use href="#i-check"/></svg></span><b>知行</b><i>任务 · 日报</i></div>
+      <div class="sb-sec"><span>清单</span><span class="plus">+</span></div>
+      <nav class="lists">
+        <a class="li active"><span class="dot" style="background:#4A7C66"></span>全部任务<em>12</em></a><a class="li"><span class="dot" style="background:#B4653A"></span>工作<em>8</em></a><a class="li"><span class="dot" style="background:#2563EB"></span>学习<em>3</em></a><a class="li"><span class="dot" style="background:#5C8D77"></span>生活<em>2</em></a><a class="li"><span class="dot" style="background:#C9CDD4"></span>无颜色<em>1</em></a>
+      </nav>
+      <div class="sb-foot">
+        <a class="sf"><svg class="ic"><use href="#i-doc"/></svg>写日报</a><a class="sf"><svg class="ic"><use href="#i-chart"/></svg>统计面板</a><a class="sf"><svg class="ic"><use href="#i-db"/></svg>备份与恢复</a><a class="sf"><svg class="ic"><use href="#i-gear"/></svg>设置</a>
+      </div>
+    </aside>
+    <main class="mn">
+      <div class="tb">
+        <h3><span class="hdot"></span>全部任务</h3>
+        <button class="btn-p"><svg class="ic"><use href="#i-plus"/></svg>新建任务</button>
+      </div>
+      <div class="bar">
+        <div class="search"><svg class="ic"><use href="#i-search"/></svg><span>搜索任务（支持拼音首字母）</span></div>
+        <span class="chip">排序：手动</span>
+        <span class="chip"><svg class="ic"><use href="#i-filter"/></svg>筛选</span>
+        <span class="chip"><svg class="ic"><use href="#i-square"/></svg>多选</span>
+      </div>
+      <div class="tasks">
+        
+        <article class="task c-prog">
+          <h4 class="">商丘航电三个季度租后检查文件替换上传</h4>
+          <div class="meta">
+            <span class="pill p-high">高</span>
+            <span class="pill s-prog">进行中</span>
+            <span class="tagx">#工作</span>
+            <span class="dotsep"></span>
+            <span class="mt">截止 11-12 18:00</span>
+          </div>
+          <div class="prog"><span style="width:60%"></span></div>
+        </article>
+        <article class="task c-pend">
+          <h4 class="">整理 Q4 客户回访清单并分派到各区域</h4>
+          <div class="meta">
+            <span class="pill p-med">中</span>
+            <span class="pill s-pend">待办</span>
+            <span class="tagx">#工作</span>
+            <span class="dotsep"></span>
+            <span class="mt">截止 11-13</span>
+          </div>
+          
+        </article>
+        <article class="task c-pend">
+          <h4 class="">读完《深度工作》第三章并整理笔记</h4>
+          <div class="meta">
+            <span class="pill p-low">低</span>
+            <span class="pill s-pend">待办</span>
+            <span class="tagx">#学习</span>
+            <span class="dotsep"></span>
+            <span class="mt">截止 11-15</span>
+          </div>
+          
+        </article>
+        <article class="task c-over">
+          <h4 class="">提交 10 月差旅报销单</h4>
+          <div class="meta">
+            <span class="pill p-high">高</span>
+            <span class="pill s-over">逾期 2 天</span>
+            <span class="tagx">#生活</span>
+            <span class="dotsep"></span>
+            <span class="mt">原定 11-09</span>
+          </div>
+          
+        </article>
+        <article class="task c-done">
+          <h4 class="done">整理本周项目周报初稿</h4>
+          <div class="meta">
+            <span class="pill p-med">中</span>
+            <span class="pill s-done">已完成</span>
+            <span class="tagx">#工作</span>
+            <span class="dotsep"></span>
+            <span class="mt">完成于 11-10 16:20</span>
+          </div>
+          
+        </article>
+      </div>
+    </main>
+    <div class="nav">
+      <a class="nb on"><svg class="ic"><use href="#i-list"/></svg>清单</a><a class="nb"><svg class="ic"><use href="#i-kanban"/></svg>看板</a><a class="nb"><svg class="ic"><use href="#i-cal"/></svg>日历</a><a class="nb"><svg class="ic"><use href="#i-chart"/></svg>统计</a><a class="nb"><svg class="ic"><use href="#i-doc"/></svg>日报</a>
+    </div>
+  </div>
+</div>
+</section>
+
+<section class="theme" id="t-hyper">
+  <div class="thead">
+    <div class="th-l">
+      <span class="th-n">08</span>
+      <div>
+        <div class="th-name">澎湃 HyperOS<span class="th-tag">明亮卡片 · 渐变</span></div>
+        <p class="th-desc">照 HyperOS 的做法：纯白卡片、24px 大圆角、蓝紫渐变按钮、悬浮胶囊底栏，卡片带一层极淡的蓝色投影，轻盈、有呼吸感。</p>
+        <div class="th-cr">
+          <span>正文 <b>18.7</b></span>
+          <span>次要 <b>6.0</b></span>
+          <span>主按钮 <b>4.8</b></span>
+          <span>选中项 <b>6.1</b></span>
+        </div>
+      </div>
+    </div>
+    <div class="th-sw"><span class="sw" style="background:#F2F4F8" title="--bg #F2F4F8"></span><span class="sw" style="background:#FFFFFF" title="--surface #FFFFFF"></span><span class="sw" style="background:#3482FF" title="--primary #3482FF"></span><span class="sw" style="background:#2A6BEA" title="--primary-btn #2A6BEA"></span><span class="sw" style="background:#0D1220" title="--text #0D1220"></span></div>
+  </div>
+  
+<div class="swrap">
+  <div class="screen t-hyper">
+    <aside class="sb">
+      <div class="brand"><span class="logo"><svg class="ic"><use href="#i-check"/></svg></span><b>知行</b><i>任务 · 日报</i></div>
+      <div class="sb-sec"><span>清单</span><span class="plus">+</span></div>
+      <nav class="lists">
+        <a class="li active"><span class="dot" style="background:#4A7C66"></span>全部任务<em>12</em></a><a class="li"><span class="dot" style="background:#B4653A"></span>工作<em>8</em></a><a class="li"><span class="dot" style="background:#2563EB"></span>学习<em>3</em></a><a class="li"><span class="dot" style="background:#5C8D77"></span>生活<em>2</em></a><a class="li"><span class="dot" style="background:#C9CDD4"></span>无颜色<em>1</em></a>
+      </nav>
+      <div class="sb-foot">
+        <a class="sf"><svg class="ic"><use href="#i-doc"/></svg>写日报</a><a class="sf"><svg class="ic"><use href="#i-chart"/></svg>统计面板</a><a class="sf"><svg class="ic"><use href="#i-db"/></svg>备份与恢复</a><a class="sf"><svg class="ic"><use href="#i-gear"/></svg>设置</a>
+      </div>
+    </aside>
+    <main class="mn">
+      <div class="tb">
+        <h3><span class="hdot"></span>全部任务</h3>
+        <button class="btn-p"><svg class="ic"><use href="#i-plus"/></svg>新建任务</button>
+      </div>
+      <div class="bar">
+        <div class="search"><svg class="ic"><use href="#i-search"/></svg><span>搜索任务（支持拼音首字母）</span></div>
+        <span class="chip">排序：手动</span>
+        <span class="chip"><svg class="ic"><use href="#i-filter"/></svg>筛选</span>
+        <span class="chip"><svg class="ic"><use href="#i-square"/></svg>多选</span>
+      </div>
+      <div class="tasks">
+        
+        <article class="task c-prog">
+          <h4 class="">商丘航电三个季度租后检查文件替换上传</h4>
+          <div class="meta">
+            <span class="pill p-high">高</span>
+            <span class="pill s-prog">进行中</span>
+            <span class="tagx">#工作</span>
+            <span class="dotsep"></span>
+            <span class="mt">截止 11-12 18:00</span>
+          </div>
+          <div class="prog"><span style="width:60%"></span></div>
+        </article>
+        <article class="task c-pend">
+          <h4 class="">整理 Q4 客户回访清单并分派到各区域</h4>
+          <div class="meta">
+            <span class="pill p-med">中</span>
+            <span class="pill s-pend">待办</span>
+            <span class="tagx">#工作</span>
+            <span class="dotsep"></span>
+            <span class="mt">截止 11-13</span>
+          </div>
+          
+        </article>
+        <article class="task c-pend">
+          <h4 class="">读完《深度工作》第三章并整理笔记</h4>
+          <div class="meta">
+            <span class="pill p-low">低</span>
+            <span class="pill s-pend">待办</span>
+            <span class="tagx">#学习</span>
+            <span class="dotsep"></span>
+            <span class="mt">截止 11-15</span>
+          </div>
+          
+        </article>
+        <article class="task c-over">
+          <h4 class="">提交 10 月差旅报销单</h4>
+          <div class="meta">
+            <span class="pill p-high">高</span>
+            <span class="pill s-over">逾期 2 天</span>
+            <span class="tagx">#生活</span>
+            <span class="dotsep"></span>
+            <span class="mt">原定 11-09</span>
+          </div>
+          
+        </article>
+        <article class="task c-done">
+          <h4 class="done">整理本周项目周报初稿</h4>
+          <div class="meta">
+            <span class="pill p-med">中</span>
+            <span class="pill s-done">已完成</span>
+            <span class="tagx">#工作</span>
+            <span class="dotsep"></span>
+            <span class="mt">完成于 11-10 16:20</span>
+          </div>
+          
+        </article>
+      </div>
+    </main>
+    <div class="nav">
+      <a class="nb on"><svg class="ic"><use href="#i-list"/></svg>清单</a><a class="nb"><svg class="ic"><use href="#i-kanban"/></svg>看板</a><a class="nb"><svg class="ic"><use href="#i-cal"/></svg>日历</a><a class="nb"><svg class="ic"><use href="#i-chart"/></svg>统计</a><a class="nb"><svg class="ic"><use href="#i-doc"/></svg>日报</a>
+    </div>
+  </div>
+</div>
+</section>
+
   <footer class="foot">
     <b>怎么用：</b>选中一版后，我把它的变量写进 <code>styles.css</code> 的 <code>:root</code>，并在设置页加一个「主题风格」下拉（现有浅色/深色之外再挂这套），可随时切换、跟系统深色联动需要再做一层映射。<br>
-    <b>注意：</b>第 06 版本身就是深色，与现有深色主题会合并成一个；第 04 版用了衬线字体，若系统缺 Songti 会回退到雅黑。所有主按钮与正文对比度均 ≥ 4.5:1。
+    <b>注意：</b>第 06 版本身就是深色，与现有深色主题会合并成一个；第 04 版用了衬线字体，若系统缺 Songti 会回退到雅黑。所有主按钮与正文对比度均 ≥ 4.5:1。<br>
+    <b>07 / 08 的额外工作量：</b>07 把底栏从「浮动胶囊」改成贴底 tab bar，08 把按钮改成渐变、卡片圆角拉到 24px——这两处不只是换变量，落地时各需改一段 CSS 骨架（约 20 行），其余仍走同一套 token。08 的 MiSans 字体需随包分发，否则回退到苹方/雅黑。
   </footer>
 </div>
 </body>

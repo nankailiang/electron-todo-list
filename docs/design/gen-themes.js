@@ -142,6 +142,72 @@ const THEMES = [
 .t-midnight .logo{color:#07161B}
 `
   },
+  {
+    id: 'ios', n: '07', name: '苹果 iOS', tag: '系统原生 · 分组列表',
+    desc: '照 iOS 的分组列表做：系统灰底、纯白卡片、细分隔线、大标题、蓝色 tint，底栏换成贴底 tab bar。没有一处装饰是多余的，也不抢注意力。',
+    vars: {
+      '--bg': '#F2F2F7', '--side-bg': '#F9F9FB', '--surface': '#FFFFFF', '--surface-2': '#F2F2F7',
+      '--border': '#E3E3E8', '--text': '#000000', '--text-2': '#6B6B70', '--text-3': '#8E8E93',
+      '--primary': '#007AFF', '--primary-btn': '#0064DE', '--primary-soft': '#EAF2FF',
+      '--primary-text': '#0058C7', '--on-solid': '#FFFFFF',
+      '--high-bg': '#FFE9E7', '--high-fg': '#C4302B', '--med-bg': '#FFF3DF', '--med-fg': '#96690B',
+      '--low-bg': '#EFEFF4', '--low-fg': '#5C5C66', '--ok-bg': '#E6F7EC', '--ok-fg': '#24803E',
+      '--danger-fg': '#C4302B',
+      '--r-card': '12px', '--r-btn': '10px', '--r-input': '10px', '--r-sm': '8px', '--r-logo': '7px',
+      '--shadow-card': '0 1px 2px rgba(0,0,0,.04)',
+      '--nav-bg': 'rgba(255,255,255,.94)',
+      '--font': '-apple-system,"SF Pro Text","PingFang SC","Microsoft YaHei UI",system-ui,sans-serif',
+      '--font-head': 'inherit',
+    },
+    extra: `
+.t-ios .tb{padding-bottom:14px}
+.t-ios .tb h3{font-size:25px;font-weight:800;letter-spacing:-.7px}
+.t-ios .search{background:#EFEFF4;border-color:transparent;border-radius:10px}
+.t-ios .task{border-color:#E3E3E8;border-left-color:var(--st);box-shadow:none}
+.t-ios .tasks{gap:8px}
+.t-ios .prog{height:3px}
+.t-ios .li{border-radius:8px;padding:7px 9px}
+.t-ios .li.active{background:#E9E9EF;color:#000;font-weight:600}
+.t-ios .li.active em{color:#8E8E93}
+.t-ios .logo{background:linear-gradient(180deg,#5AC8FA,#007AFF)}
+.t-ios .nav{left:226px;right:0;width:auto;transform:none;border-radius:0;border:none;border-top:1px solid #D8D8DE;box-shadow:0 -1px 0 rgba(0,0,0,.03);background:var(--nav-bg);padding:5px 8px 9px;justify-content:space-around}
+.t-ios .nb{flex-direction:column;gap:1px;padding:5px 10px;border-radius:8px;font-size:10px;font-weight:500}
+.t-ios .nb .ic{width:17px;height:17px}
+.t-ios .nb.on{background:transparent;color:var(--primary);font-weight:600;box-shadow:none}
+`
+  },
+  {
+    id: 'hyper', n: '08', name: '澎湃 HyperOS', tag: '明亮卡片 · 渐变',
+    desc: '照 HyperOS 的做法：纯白卡片、24px 大圆角、蓝紫渐变按钮、悬浮胶囊底栏，卡片带一层极淡的蓝色投影，轻盈、有呼吸感。',
+    vars: {
+      '--bg': '#F2F4F8', '--side-bg': '#FAFBFD', '--surface': '#FFFFFF', '--surface-2': '#F1F4F9',
+      '--border': '#E7ECF3', '--text': '#0D1220', '--text-2': '#5A6472', '--text-3': '#939CAA',
+      '--primary': '#3482FF', '--primary-btn': '#2A6BEA', '--primary-soft': '#ECF2FF',
+      '--primary-text': '#1B4FD1', '--on-solid': '#FFFFFF',
+      '--high-bg': '#FFEDED', '--high-fg': '#C62F2F', '--med-bg': '#FFF3E0', '--med-fg': '#96601A',
+      '--low-bg': '#EFF2F7', '--low-fg': '#5A6472', '--ok-bg': '#E8F7EF', '--ok-fg': '#1F7A4D',
+      '--danger-fg': '#C62F2F',
+      '--r-card': '24px', '--r-btn': '16px', '--r-input': '18px', '--r-sm': '12px', '--r-logo': '12px',
+      '--shadow-card': '0 6px 20px -12px rgba(45,90,190,.20)',
+      '--nav-bg': 'rgba(255,255,255,.96)',
+      '--font': '"MiSans","PingFang SC","Microsoft YaHei UI",system-ui,sans-serif',
+      '--font-head': 'inherit',
+    },
+    extra: `
+.t-hyper .btn-p{background:linear-gradient(135deg,#3C86FF,#1B4FD1);box-shadow:0 8px 20px -8px rgba(43,106,234,.55);border-radius:16px;padding:10px 17px}
+.t-hyper .tb h3{font-size:22px;letter-spacing:-.3px}
+.t-hyper .task{border-color:rgba(231,236,243,.9);border-left-color:var(--st);box-shadow:0 6px 20px -12px rgba(45,90,190,.22)}
+.t-hyper .tasks{gap:10px}
+.t-hyper .search{background:#F1F4F9;border-color:transparent;border-radius:18px;padding:10px 14px}
+.t-hyper .chip{background:#F1F4F9;border-color:transparent;border-radius:14px;padding:9px 13px}
+.t-hyper .nav{padding:6px;border-radius:26px;box-shadow:0 14px 32px -14px rgba(30,60,120,.40)}
+.t-hyper .nb{border-radius:20px;padding:8px 15px}
+.t-hyper .nb.on{background:linear-gradient(135deg,#3C86FF,#1B4FD1);box-shadow:0 6px 14px -6px rgba(43,106,234,.6)}
+.t-hyper .li.active{background:#ECF2FF;border-radius:12px}
+.t-hyper .logo{background:linear-gradient(135deg,#4A8CFF,#1B4FD1);border-radius:10px}
+.t-hyper .prog{height:5px;background:#E7EEFB}
+`
+  },
 ];
 
 // ---- 卡片数据 ----
@@ -354,7 +420,7 @@ const html = `<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>知行 · 主题风格方案（6 版设计图）</title>
+<title>知行 · 主题风格方案（8 版设计图）</title>
 <style>
 ${css}
 ${THEMES.map(t => `.t-${t.id}{\n${themeVars(t)}\n}`).join('\n')}
@@ -382,8 +448,8 @@ ${THEMES.map(t => t.extra).join('\n')}
   <header class="bh">
     <div>
       <h1>知行 · 主题风格方案</h1>
-      <p class="sub">同一套界面骨架（侧栏 + 工具栏 + 任务卡 + 浮动底栏），配六种视觉语言。每版的底色、主色、圆角、阴影、字体都不同，但布局、间距、信息层级完全一致——选定后只需替换 <code>:root</code> 里那套变量。</p>
-      <p class="meta">2026-11-11 · 6 版 · 数据为示意 · 对比度按 WCAG 2.1 实测</p>
+      <p class="sub">同一套界面骨架（侧栏 + 工具栏 + 任务卡 + 浮动底栏），配八种视觉语言。每版的底色、主色、圆角、阴影、字体都不同，但布局、间距、信息层级完全一致——选定后只需替换 <code>:root</code> 里那套变量。后两版（07/08）参考 iOS 与澎湃 HyperOS 的系统语言。</p>
+      <p class="meta">2026-11-12 · 8 版 · 数据为示意 · 对比度按 WCAG 2.1 实测</p>
     </div>
   </header>
 
@@ -395,7 +461,8 @@ ${THEMES.map(t => t.extra).join('\n')}
 
   <footer class="foot">
     <b>怎么用：</b>选中一版后，我把它的变量写进 <code>styles.css</code> 的 <code>:root</code>，并在设置页加一个「主题风格」下拉（现有浅色/深色之外再挂这套），可随时切换、跟系统深色联动需要再做一层映射。<br>
-    <b>注意：</b>第 06 版本身就是深色，与现有深色主题会合并成一个；第 04 版用了衬线字体，若系统缺 Songti 会回退到雅黑。所有主按钮与正文对比度均 ≥ 4.5:1。
+    <b>注意：</b>第 06 版本身就是深色，与现有深色主题会合并成一个；第 04 版用了衬线字体，若系统缺 Songti 会回退到雅黑。所有主按钮与正文对比度均 ≥ 4.5:1。<br>
+    <b>07 / 08 的额外工作量：</b>07 把底栏从「浮动胶囊」改成贴底 tab bar，08 把按钮改成渐变、卡片圆角拉到 24px——这两处不只是换变量，落地时各需改一段 CSS 骨架（约 20 行），其余仍走同一套 token。08 的 MiSans 字体需随包分发，否则回退到苹方/雅黑。
   </footer>
 </div>
 </body>
